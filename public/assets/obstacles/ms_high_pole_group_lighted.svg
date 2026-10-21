@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="91" height="122" viewBox="0 0 91 122">
+  <path d="M0,32.48L18.83,32.48" fill="none" fill-rule="evenodd" stroke="#E3000B" stroke-width="7.14"/>
+  <path d="M30.52,121.73C27.5,121.73 25.06,119.29 25.06,116.27C25.06,113.25 27.5,110.81 30.52,110.81C31.95,110.81 33.32,111.38 34.33,112.39C35.34,113.4 35.91,114.77 35.91,116.2C35.93,117.65 35.37,119.04 34.36,120.08C33.35,121.12 31.97,121.71 30.52,121.73L30.52,121.73Z" fill="#E3000B" fill-rule="nonzero" stroke="none" stroke-width="1"/>
+  <path d="M22.82,22.82L9.52,9.52" fill="none" fill-rule="evenodd" stroke="#E3000B" stroke-width="7.14"/>
+  <path d="M32.48,18.83L32.48,0" fill="none" fill-rule="evenodd" stroke="#E3000B" stroke-width="7.14"/>
+  <path d="M60.27,121.73C57.25,121.73 54.81,119.29 54.81,116.27C54.81,113.25 57.25,110.81 60.27,110.81C63.29,110.81 65.73,113.25 65.73,116.27C65.73,119.29 63.29,121.73 60.27,121.73Z" fill="#E3000B" fill-rule="nonzero" stroke="none" stroke-width="1"/>
+  <path d="M58.17,18.83L58.17,0" fill="none" fill-rule="evenodd" stroke="#E3000B" stroke-width="7.14"/>
+  <path d="M90.65,32.48L71.82,32.48" fill="none" fill-rule="evenodd" stroke="#E3000B" stroke-width="7.14"/>
+  <path d="M67.83,22.82L81.13,9.52" fill="none" fill-rule="evenodd" stroke="#E3000B" stroke-width="7.14"/>
+  <path d="M62.02,63L62.02,30.73L54.32,30.73L54.32,63C54.47,73.57 51.31,83.92 45.29,92.61C39.33,83.89 36.2,73.56 36.33,63L36.33,30.73L28.56,30.73L28.56,63C28.56,87.15 18.13,96.74 1.33,115.99L6.79,121.24C16.91,112.16 25.57,101.58 32.48,89.88C36.36,96.22 40.63,102.29 45.29,108.08C49.99,102.31 54.3,96.23 58.17,89.88C65.11,101.61 73.82,112.19 84,121.24L89.46,115.99C72.52,96.74 62.02,87.15 62.02,63Z" fill="#E3000B" fill-rule="nonzero" stroke="none" stroke-width="1"/>
+</svg>

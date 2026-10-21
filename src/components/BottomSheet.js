@@ -1,0 +1,236 @@
+import { store } from '../state.js';
+
+export function renderBottomSheet(container) {
+  const { selectedSite, selectedStation, selectedWebcam } = store.state;
+  const t = store.t;
+
+  if (!selectedSite && !selectedStation && !selectedWebcam) {
+    container.innerHTML = '';
+    container.classList.add('hidden');
+    return;
+  }
+
+  container.classList.remove('hidden');
+
+  // 1. FLYING SITE DETAILS
+  if (selectedSite) {
+    const p = selectedSite.properties || {};
+    const geom = selectedSite.geometry || {};
+    const coords = geom.coordinates || [0, 0]; // [lng, lat]
+    const isLaunch = p.type === 'launch' || p.type === 'launcharea';
+    const isLanding = p.type === 'landing' || p.type === 'landingarea' || p.type === 'landingpattern';
+
+    // Compass wind rose tags
+    const launchDirs = p.launchDirections || [];
+    const allDirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const windPills = allDirs.map(d => {
+      const isOk = launchDirs.includes(d);
+      return `<span class="wind-tag ${isOk ? 'wind-ok' : 'wind-no'}">${d}</span>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="sheet-scrim" id="sheet-scrim"></div>
+      <div class="sheet-content">
+        <div class="sheet-drag-handle"></div>
+
+        <div class="sheet-header">
+          <div class="sheet-title-group">
+            <span class="sheet-badge ${isLaunch ? 'badge-launch' : isLanding ? 'badge-landing' : 'badge-general'}">
+              ${isLaunch ? 'Startplatz (Take-off)' : isLanding ? 'Landeplatz (Landing)' : (p.type || 'Fluggebiet')}
+            </span>
+            <h2 class="sheet-title">${p.siteName || 'Unbenannter Flugplatz'}</h2>
+            <div class="sheet-meta">
+              <span class="meta-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>
+                ${p.elevation ? `${p.elevation} m ü. M.` : 'Höhe n/a'}
+              </span>
+              <span class="meta-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                ${coords[1].toFixed(4)}° N, ${coords[0].toFixed(4)}° E
+              </span>
+            </div>
+          </div>
+          <button class="sheet-close" id="sheet-close-btn">&times;</button>
+        </div>
+
+        <div class="sheet-body">
+          ${isLaunch ? `
+            <!-- Wind Suitability -->
+            <div class="sheet-section">
+              <h4 class="section-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>
+                ${t.map.windSuitable}
+              </h4>
+              <div class="wind-rose-grid">
+                ${windPills}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Guidelines & Rules -->
+          ${p.siteDescription ? `
+            <div class="sheet-section">
+              <h4 class="section-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                ${t.map.rules}
+              </h4>
+              <p class="section-text">${escapeHtml(p.siteDescription).replace(/\n/g, '<br/>')}</p>
+            </div>
+          ` : ''}
+
+          <!-- Hazards -->
+          ${p.hazards ? `
+            <div class="sheet-section section-warning">
+              <h4 class="section-title text-warning">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                ${t.map.hazards}
+              </h4>
+              <p class="section-text">${escapeHtml(p.hazards).replace(/\n/g, '<br/>')}</p>
+            </div>
+          ` : ''}
+
+          <!-- Access Instructions -->
+          ${p.access ? `
+            <div class="sheet-section">
+              <h4 class="section-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+                ${t.map.access}
+              </h4>
+              <p class="section-text">${escapeHtml(p.access).replace(/\n/g, '<br/>')}</p>
+            </div>
+          ` : ''}
+
+          <!-- Responsible Club -->
+          ${p.responsible ? `
+            <div class="sheet-section">
+              <h4 class="section-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                ${t.map.responsible}
+              </h4>
+              <div class="club-row">
+                <span class="club-name">${p.responsible}</span>
+                ${p.clubLink ? `<a href="${p.clubLink}" target="_blank" rel="noopener" class="btn-link">Website ↗</a>` : ''}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Actions: Navigation & Emergency -->
+          <div class="sheet-actions">
+            <a href="https://maps.apple.com/?daddr=${coords[1]},${coords[0]}" target="_blank" class="btn-action btn-nav">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+              ${t.map.openInMaps}
+            </a>
+            <a href="tel:1414" class="btn-action btn-sos">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              Rega 1414
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  // 2. WEATHER STATION DETAILS
+  else if (selectedStation) {
+    const p = selectedStation.properties || {};
+    const coords = selectedStation.geometry?.coordinates || [0, 0];
+    const windSpeedKmH = p.windSpeedValue ? Math.round(p.windSpeedValue * 3.6) : null;
+    const windGustKmH = p.windGustValue ? Math.round(p.windGustValue * 3.6) : null;
+    const tempC = p.temperatureValue ? (p.temperatureValue > 200 ? Math.round((p.temperatureValue - 273.15) * 10) / 10 : Math.round(p.temperatureValue * 10) / 10) : null;
+    const qnh = p.pressureStandardMslValue ? (p.pressureStandardMslValue > 5000 ? Math.round(p.pressureStandardMslValue / 10) : Math.round(p.pressureStandardMslValue)) : null;
+
+    container.innerHTML = `
+      <div class="sheet-scrim" id="sheet-scrim"></div>
+      <div class="sheet-content">
+        <div class="sheet-drag-handle"></div>
+
+        <div class="sheet-header">
+          <div class="sheet-title-group">
+            <span class="sheet-badge badge-station">Live Wetterstation</span>
+            <h2 class="sheet-title">${p.name || 'Wetterstation'}</h2>
+            <div class="sheet-meta">
+              <span class="meta-item">${p.altitude ? `${p.altitude} m ü. M.` : ''}</span>
+              <span class="meta-item">Provider: ${(p.providerKey || 'MeteoSchweiz').toUpperCase()}</span>
+            </div>
+          </div>
+          <button class="sheet-close" id="sheet-close-btn">&times;</button>
+        </div>
+
+        <div class="sheet-body">
+          <div class="station-grid-card">
+            <div class="stat-box">
+              <span class="stat-label">${t.weather.wind}</span>
+              <span class="stat-val">${windSpeedKmH !== null ? `${windSpeedKmH} km/h` : 'n/a'}</span>
+              <span class="stat-sub">${p.windDirectionValue ? `${Math.round(p.windDirectionValue)}°` : ''}</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">${t.weather.gust}</span>
+              <span class="stat-val text-warning">${windGustKmH !== null ? `${windGustKmH} km/h` : 'n/a'}</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">${t.weather.temp}</span>
+              <span class="stat-val">${tempC !== null ? `${tempC}°C` : 'n/a'}</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">${t.weather.pressure}</span>
+              <span class="stat-val">${qnh ? `${qnh} hPa` : 'n/a'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  // 3. WEBCAM DETAILS
+  else if (selectedWebcam) {
+    const wc = selectedWebcam;
+    container.innerHTML = `
+      <div class="sheet-scrim" id="sheet-scrim"></div>
+      <div class="sheet-content">
+        <div class="sheet-drag-handle"></div>
+
+        <div class="sheet-header">
+          <div class="sheet-title-group">
+            <span class="sheet-badge badge-webcam">Live Webcam</span>
+            <h2 class="sheet-title">${wc.name || 'Webcam'}</h2>
+            <div class="sheet-meta">
+              <span>${wc.altitudeM ? `${Math.round(wc.altitudeM)} m ü. M.` : ''}</span>
+              <span>${wc.providerDisplayName || ''}</span>
+            </div>
+          </div>
+          <button class="sheet-close" id="sheet-close-btn">&times;</button>
+        </div>
+
+        <div class="sheet-body">
+          <div class="webcam-viewer">
+            <img src="${wc.latestImageUrl}" alt="${wc.name}" class="webcam-img" onerror="this.src='${wc.thumbnailUrl}'"/>
+          </div>
+          ${wc.providerUrl ? `
+            <div class="mt-2 text-right">
+              <a href="${wc.providerUrl}" target="_blank" rel="noopener" class="btn-link">Quelle: ${wc.providerDisplayName} ↗</a>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  // Close event
+  const closeBtn = container.querySelector('#sheet-close-btn');
+  const scrim = container.querySelector('#sheet-scrim');
+  const close = () => {
+    store.selectSite(null);
+    store.selectStation(null);
+    store.selectWebcam(null);
+  };
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  if (scrim) scrim.addEventListener('click', close);
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}

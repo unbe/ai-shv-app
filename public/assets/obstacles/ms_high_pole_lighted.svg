@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="65" height="122" viewBox="0 0 65 122">
+  <path d="M0,32.48L18.83,32.48" fill="none" fill-rule="evenodd" stroke="#E3000B" stroke-width="7.14"/>
+  <path d="M32.55,121.73C29.53,121.73 27.09,119.29 27.09,116.27C27.09,113.25 29.53,110.81 32.55,110.81C33.98,110.81 35.35,111.38 36.36,112.39C37.37,113.4 37.94,114.77 37.94,116.2C37.96,117.65 37.4,119.04 36.39,120.08C35.38,121.12 34,121.71 32.55,121.73L32.55,121.73Z" fill="#E3000B" fill-rule="nonzero" stroke="none" stroke-width="1"/>
+  <path d="M22.82,22.82L9.52,9.52" fill="none" fill-rule="evenodd" stroke="#E3000B" stroke-width="7.14"/>
+  <path d="M32.48,18.83L32.48,0" fill="none" fill-rule="evenodd" stroke="#E3000B" stroke-width="7.14"/>
+  <path d="M64.89,32.48L46.06,32.48" fill="none" fill-rule="evenodd" stroke="#E3000B" stroke-width="7.14"/>
+  <path d="M42.07,22.82L55.44,9.52" fill="none" fill-rule="evenodd" stroke="#E3000B" stroke-width="7.14"/>
+  <path d="M32.48,30.73L36.33,30.73L36.33,63C36.33,87.15 46.83,96.74 63.63,115.99L58.17,121.24C48.04,112.18 39.37,101.6 32.48,89.88C25.63,101.57 17.04,112.15 7,121.24L1.54,115.99C18.13,96.74 28.56,87.15 28.56,63L28.56,30.73L32.48,30.73Z" fill="#E3000B" fill-rule="nonzero" stroke="none" stroke-width="1"/>
+</svg>
