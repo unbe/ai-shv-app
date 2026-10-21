@@ -15,8 +15,8 @@ export function renderBottomSheet(container) {
   // 1. FLYING SITE DETAILS
   if (selectedSite) {
     const p = selectedSite.properties || {};
-    const geom = selectedSite.geometry || {};
-    const coords = geom.coordinates || [0, 0]; // [lng, lat]
+    const latLng = getSiteCenterLatLng(selectedSite) || [46.8, 8.2];
+    const [lat, lng] = latLng;
     const isLaunch = p.type === 'launch' || p.type === 'launcharea';
     const isLanding = p.type === 'landing' || p.type === 'landingarea' || p.type === 'landingpattern';
 
@@ -46,7 +46,7 @@ export function renderBottomSheet(container) {
               </span>
               <span class="meta-item">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
-                ${coords[1].toFixed(4)}° N, ${coords[0].toFixed(4)}° E
+                ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E
               </span>
             </div>
           </div>
@@ -116,7 +116,7 @@ export function renderBottomSheet(container) {
 
           <!-- Actions: Navigation & Emergency -->
           <div class="sheet-actions">
-            <a href="https://maps.apple.com/?daddr=${coords[1]},${coords[0]}" target="_blank" class="btn-action btn-nav">
+            <a href="https://maps.apple.com/?daddr=${lat},${lng}" target="_blank" class="btn-action btn-nav">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
               ${t.map.openInMaps}
             </a>
@@ -223,6 +223,45 @@ export function renderBottomSheet(container) {
   };
   if (closeBtn) closeBtn.addEventListener('click', close);
   if (scrim) scrim.addEventListener('click', close);
+}
+
+function getSiteCenterLatLng(feature) {
+  const geom = feature?.geometry;
+  if (!geom || !geom.coordinates) return null;
+  const t = geom.type;
+  const coords = geom.coordinates;
+
+  if (t === 'Point') {
+    if (Array.isArray(coords) && coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+      return [coords[1], coords[0]];
+    }
+  } else if (t === 'Polygon') {
+    const ring = coords[0];
+    if (Array.isArray(ring) && ring.length > 0) {
+      let sumLat = 0, sumLng = 0, count = 0;
+      for (const pt of ring) {
+        if (Array.isArray(pt) && pt.length >= 2 && typeof pt[0] === 'number' && typeof pt[1] === 'number') {
+          sumLng += pt[0];
+          sumLat += pt[1];
+          count++;
+        }
+      }
+      if (count > 0) return [sumLat / count, sumLng / count];
+    }
+  } else if (t === 'LineString') {
+    if (Array.isArray(coords) && coords.length > 0) {
+      let sumLat = 0, sumLng = 0, count = 0;
+      for (const pt of coords) {
+        if (Array.isArray(pt) && pt.length >= 2 && typeof pt[0] === 'number' && typeof pt[1] === 'number') {
+          sumLng += pt[0];
+          sumLat += pt[1];
+          count++;
+        }
+      }
+      if (count > 0) return [sumLat / count, sumLng / count];
+    }
+  }
+  return null;
 }
 
 function escapeHtml(text) {

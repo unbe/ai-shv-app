@@ -321,6 +321,55 @@ export class MapView {
     }
   }
 
+  getFeatureLatLng(feature) {
+    const geom = feature?.geometry;
+    if (!geom || !geom.coordinates) return null;
+    const t = geom.type;
+    const coords = geom.coordinates;
+
+    if (t === 'Point') {
+      if (Array.isArray(coords) && coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+        if (!isNaN(coords[0]) && !isNaN(coords[1])) {
+          return [coords[1], coords[0]];
+        }
+      }
+    } else if (t === 'Polygon') {
+      const ring = coords[0];
+      if (Array.isArray(ring) && ring.length > 0) {
+        let sumLat = 0, sumLng = 0, count = 0;
+        for (const pt of ring) {
+          if (Array.isArray(pt) && pt.length >= 2 && typeof pt[0] === 'number' && typeof pt[1] === 'number') {
+            sumLng += pt[0];
+            sumLat += pt[1];
+            count++;
+          }
+        }
+        if (count > 0) return [sumLat / count, sumLng / count];
+      }
+    } else if (t === 'LineString') {
+      if (Array.isArray(coords) && coords.length > 0) {
+        let sumLat = 0, sumLng = 0, count = 0;
+        for (const pt of coords) {
+          if (Array.isArray(pt) && pt.length >= 2 && typeof pt[0] === 'number' && typeof pt[1] === 'number') {
+            sumLng += pt[0];
+            sumLat += pt[1];
+            count++;
+          }
+        }
+        if (count > 0) return [sumLat / count, sumLng / count];
+      }
+    } else if (t === 'MultiPolygon') {
+      const firstPoly = coords[0];
+      if (Array.isArray(firstPoly) && Array.isArray(firstPoly[0]) && firstPoly[0].length > 0) {
+        const pt = firstPoly[0][0];
+        if (Array.isArray(pt) && pt.length >= 2 && typeof pt[0] === 'number' && typeof pt[1] === 'number') {
+          return [pt[1], pt[0]];
+        }
+      }
+    }
+    return null;
+  }
+
   renderFlyingSites() {
     this.launchesLayer.clearLayers();
     this.landingsLayer.clearLayers();
@@ -332,15 +381,14 @@ export class MapView {
 
     for (const feature of this.rawFlyingSites.features) {
       const p = feature.properties || {};
-      const coords = feature.geometry?.coordinates;
-      if (!coords || coords.length < 2) continue;
-
-      const [lng, lat] = coords;
       const type = (p.type || '').toLowerCase();
       const isLaunch = type === 'launch' || type === 'launcharea';
       const isLanding = type === 'landing' || type === 'landingarea' || type === 'landingpattern';
 
       if (!isLaunch && !isLanding) continue;
+
+      const latLng = this.getFeatureLatLng(feature);
+      if (!latLng) continue;
 
       // Filter by Search Query
       if (query) {
@@ -358,22 +406,20 @@ export class MapView {
       }
 
       // Create Custom Paragliding Marker
-      const marker = this.createFlyingSiteMarker(feature, isLaunch);
-      if (isLaunch) {
-        this.launchesLayer.addLayer(marker);
-      } else {
-        this.landingsLayer.addLayer(marker);
+      const marker = this.createFlyingSiteMarker(feature, latLng, isLaunch);
+      if (marker) {
+        if (isLaunch) {
+          this.launchesLayer.addLayer(marker);
+        } else {
+          this.landingsLayer.addLayer(marker);
+        }
       }
     }
   }
 
-  createFlyingSiteMarker(feature, isLaunch) {
+  createFlyingSiteMarker(feature, latLng, isLaunch) {
     const p = feature.properties || {};
-    const coords = feature.geometry.coordinates;
-    const latLng = [coords[1], coords[0]];
-
     const primaryDir = (p.launchDirections && p.launchDirections[0]) || '';
-    const elevationStr = p.elevation ? `${p.elevation}m` : '';
 
     // HTML Icon for launch / landing
     const iconHtml = isLaunch ? `
@@ -542,6 +588,7 @@ export class MapView {
       const coords = f.geometry?.coordinates;
       const p = f.properties || {};
       if (!coords || !p.windSpeedValue) continue;
+      if (typeof coords[0] !== 'number' || typeof coords[1] !== 'number' || isNaN(coords[0]) || isNaN(coords[1])) continue;
 
       const latLng = [coords[1], coords[0]];
       const speedKmH = Math.round(p.windSpeedValue * 3.6);
@@ -631,7 +678,7 @@ export class MapView {
     if (!this.rawWebcams || !this.rawWebcams.webcams) return;
 
     for (const wc of this.rawWebcams.webcams) {
-      if (!wc.latitude || !wc.longitude) continue;
+      if (typeof wc.latitude !== 'number' || typeof wc.longitude !== 'number' || isNaN(wc.latitude) || isNaN(wc.longitude)) continue;
       const latLng = [wc.latitude, wc.longitude];
 
       const iconHtml = `

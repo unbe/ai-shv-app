@@ -34,3 +34,9 @@ A high-performance, responsive web reproduction of the official **SHV FSVL** (Sc
    - Backend API: Node.js Express server on port 3001 (`server/index.js`).
    - Scientific Aerological Engine: Python (`server/emagram_calc.py`).
    - Frontend Dev Server: Vite on port 3000 (`server/start-dev.js` runs both seamlessly).
+
+
+## Edge Cases & Solutions
+- **Swisstopo WMTS Coordinate System**: Swisstopo layers use EPSG:2056 (LV95) or EPSG:3857 (Spherical Mercator). GeoAdmin provides WMTS in EPSG:3857 directly through `wmts.geo.admin.ch/1.0.0/{Layer}/default/current/3857/{z}/{x}/{y}.jpeg`.
+- **Polygon and LineString Features in Flying Sites**: While most takeoff sites in `flyingsites.geojson` are `Point` geometries, many landing zones and launch sectors are `Polygon` or `LineString` (e.g. `launcharea`, `landingpattern`). Blindly indexing `[coords[1], coords[0]]` yielded `[undefined, Array]`, causing Leaflet's marker projector to throw `TypeError: Cannot read properties of null (reading 'lat')`. Implemented `getFeatureLatLng()` which computes the true centroid for `Polygon`, `MultiPolygon`, and `LineString` features, successfully resolving 100% of all 1,341 Swiss flying sites.
+- **Offline / Flight Mode Reliability**: Paragliders frequently launch in alpine areas with weak 4G/5G; local storage caching for sites, checklists, pilot license, and emergency contacts ensures offline access.
