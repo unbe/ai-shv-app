@@ -39,8 +39,8 @@ export class ForecastView {
             <a href="https://www.shv-fsvl.ch/wetter" target="_blank" rel="noopener" class="btn-primary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
               <span>Offizielles SHV Wetterportal öffnen ↗</span>
             </a>
-            <a href="https://login.shv-fsvl.ch/realms/SHV/protocol/openid-connect/auth?scope=openid&response_type=code&approval_prompt=auto&redirect_uri=https%3A%2F%2Fwww.shv-fsvl.ch%2Ftypo3conf%2Fext%2Foidc%2FResources%2FPublic%2Fcallback.php&client_id=typo3" target="_blank" rel="noopener" class="btn-secondary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
-              <span>Offizielles SHV Keycloak Login ↗</span>
+            <a href="https://www.shv-fsvl.ch/anmelden/login/" target="_blank" rel="noopener" class="btn-secondary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
+              <span>SHV Web-Login (shv-fsvl.ch) ↗</span>
             </a>
           </div>
         </div>
