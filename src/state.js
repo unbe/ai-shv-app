@@ -67,46 +67,7 @@ class AppState {
     } catch (e) {
       console.error('[AppState.loadSavedLogs] Failed to parse saved flights from localStorage:', e);
     }
-
-    // Default sample flights in Switzerland
-    return [
-      {
-        id: 'f-1',
-        date: '2026-10-18',
-        site: 'Interlaken - Amisbühl (Beatenberg)',
-        landing: 'Höhematte Interlaken',
-        glider: 'Advance Iota DLS',
-        duration: 85,
-        maxAlt: 2150,
-        distance: 28.4,
-        type: 'Thermik / Soaring',
-        notes: 'Herrlicher Herbstflug mit Blick auf Eiger, Mönch und Jungfrau. Traumhafte Basis bei 2150m.',
-      },
-      {
-        id: 'f-2',
-        date: '2026-10-12',
-        site: 'Fiesch - Fiescheralp',
-        landing: 'Fiesch Landeplatz',
-        glider: 'Advance Iota DLS',
-        duration: 145,
-        maxAlt: 3420,
-        distance: 64.2,
-        type: 'Streckenflug (XC)',
-        notes: 'Aletschgletscher Querung Richtung Grimselpass. Wunderbares Steigen im Bellwald Kessel.',
-      },
-      {
-        id: 'f-3',
-        date: '2026-09-28',
-        site: 'Engelberg - Brunni Brunnihütte',
-        landing: 'Sportplatz Engelberg',
-        glider: 'Advance Iota DLS',
-        duration: 55,
-        maxAlt: 2300,
-        distance: 14.5,
-        type: 'Lokale Thermik',
-        notes: 'Ruhige Abendthermik am Rigidalstock.',
-      },
-    ];
+    return [];
   }
 
   loadSavedProfile() {
@@ -116,21 +77,21 @@ class AppState {
     } catch (e) {
       console.error('[AppState.loadSavedProfile] Failed to parse saved profile from localStorage:', e);
     }
+    return null;
+  }
 
-    return {
-      shvNumber: '58412',
-      firstName: 'Marco',
-      lastName: 'Odermatt',
-      birthDate: '12.05.1992',
-      canton: 'BE',
-      memberCategory: 'Aktivmitglied Pilot',
-      ratings: ['Brevet Gleitschirm', 'IPPI Card Stage 5', 'Passagierberechtigung BAX'],
-      validUntil: '31.12.2027',
-      club: 'Gleitschirmclub Jungfrau',
-      insuranceCompany: 'Generali Versicherungen / SHV Kollektiv',
-      insuranceCoverage: 'CHF 10\'000\'000.-',
-      token: 'SHV-CH-58412-V27-991A',
-    };
+  setProfile(profile) {
+    this.state.profile = profile;
+    if (profile) {
+      localStorage.setItem('shv_profile', JSON.stringify(profile));
+    } else {
+      localStorage.removeItem('shv_profile');
+    }
+    this.notify();
+  }
+
+  logout() {
+    this.setProfile(null);
   }
 
   subscribe(listener) {

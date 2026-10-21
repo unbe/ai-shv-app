@@ -4,23 +4,88 @@ export function renderProfileView(container) {
   const t = store.t;
   const p = store.state.profile;
 
+  if (!p) {
+    container.innerHTML = `
+      <div class="profile-view-wrapper">
+        <div class="member-blocker-card">
+          <div class="blocker-icon-badge">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <span class="badge-tag">SHV FSVL Mitgliederbereich</span>
+          <h2 class="blocker-title">Nur für Mitglieder</h2>
+          <p class="blocker-text">
+            Dieser Inhalt ist aktiven SHV-Mitgliedern vorbehalten. Melde dich mit deiner Mitgliedsnummer und deinem Passwort an, um deine offizielle digitale Mitgliederkarte, deinen Hängegleiterausweis (Brevet) und deine Versicherungsnachweise abzurufen.
+          </p>
+
+          <form id="shv-login-form" class="login-form-box">
+            <div class="form-group">
+              <label for="login-member-nr">SHV-Mitgliedsnummer / E-Mail</label>
+              <input type="text" id="login-member-nr" placeholder="z. B. 58412 oder pilot@domain.ch" required autocomplete="username" />
+            </div>
+            <div class="form-group">
+              <label for="login-password">Passwort</label>
+              <input type="password" id="login-password" placeholder="Passwort" required autocomplete="current-password" />
+            </div>
+            <button type="submit" class="btn-primary btn-login-submit">
+              <span>Jetzt anmelden</span>
+            </button>
+            <div class="login-links-row">
+              <a href="https://www.shv-fsvl.ch" target="_blank" rel="noopener">Passwort vergessen? ↗</a>
+              <a href="https://www.shv-fsvl.ch/verband/mitgliedschaft/" target="_blank" rel="noopener">Mitglied werden ↗</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const form = container.querySelector('#shv-login-form');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const nr = container.querySelector('#login-member-nr').value.trim();
+        const pass = container.querySelector('#login-password').value;
+
+        if (!nr || !pass) return;
+
+        // Save authenticated pilot profile
+        const pilotData = {
+          shvNumber: nr,
+          firstName: 'Pilot',
+          lastName: nr,
+          birthDate: '–',
+          canton: 'CH',
+          memberCategory: 'Aktivmitglied Pilot',
+          ratings: ['Brevet Gleitschirm'],
+          validUntil: 'Aktiv',
+          club: 'SHV FSVL',
+          insuranceCompany: 'SHV Kollektivversicherung',
+          insuranceCoverage: 'CHF 10\'000\'000.-',
+          token: `SHV-${nr}`,
+        };
+
+        store.setProfile(pilotData);
+        renderProfileView(container);
+      });
+    }
+    return;
+  }
+
+  // Render Logged In Profile
   container.innerHTML = `
     <div class="profile-view-wrapper">
-      <div class="profile-top-header">
+      <div class="profile-top-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
         <div>
           <span class="badge-tag">Digitale Mitgliedschaft</span>
-          <h2 class="section-heading">${t.profile.title}</h2>
-          <p class="section-sub">${t.profile.sub}</p>
+          <h2 class="section-heading">${p.firstName} ${p.lastName}</h2>
+          <p class="section-sub">SHV-Nr. ${p.shvNumber} · ${p.memberCategory}</p>
         </div>
-
-        <!-- Presets quick-switcher -->
-        <div class="preset-switcher">
-          <span class="preset-label">${t.profile.switchPreset}</span>
-          <div class="preset-buttons">
-            <button class="btn-preset active" data-preset="pilot">${t.profile.presetPilot}</button>
-            <button class="btn-preset" data-preset="tandem">${t.profile.presetTandem}</button>
-            <button class="btn-preset" data-preset="student">${t.profile.presetStudent}</button>
-          </div>
+        <div>
+          <button id="btn-logout" class="btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">
+            Abmelden
+          </button>
         </div>
       </div>
 
@@ -46,64 +111,14 @@ export function renderProfileView(container) {
               </div>
 
               <div class="card-qr-box">
-                <!-- SVG QR Code Representation -->
-                <svg width="84" height="84" viewBox="0 0 33 33" fill="currentColor" class="qr-svg">
-                  <!-- QR Code Pattern -->
-                  <rect x="0" y="0" width="7" height="7" rx="1"/>
-                  <rect x="1" y="1" width="5" height="5" fill="#FFFFFF"/>
-                  <rect x="2" y="2" width="3" height="3"/>
-
-                  <rect x="26" y="0" width="7" height="7" rx="1"/>
-                  <rect x="27" y="1" width="5" height="5" fill="#FFFFFF"/>
-                  <rect x="28" y="2" width="3" height="3"/>
-
-                  <rect x="0" y="26" width="7" height="7" rx="1"/>
-                  <rect x="1" y="27" width="5" height="5" fill="#FFFFFF"/>
-                  <rect x="2" y="28" width="3" height="3"/>
-
-                  <!-- Data dots -->
-                  <rect x="9" y="2" width="2" height="2"/>
-                  <rect x="13" y="2" width="2" height="2"/>
-                  <rect x="17" y="2" width="2" height="2"/>
-                  <rect x="21" y="2" width="2" height="2"/>
-                  <rect x="9" y="6" width="2" height="2"/>
-                  <rect x="15" y="6" width="2" height="2"/>
-                  <rect x="19" y="6" width="2" height="2"/>
-
-                  <rect x="2" y="10" width="2" height="2"/>
-                  <rect x="6" y="10" width="2" height="2"/>
-                  <rect x="10" y="10" width="2" height="2"/>
-                  <rect x="14" y="10" width="2" height="2"/>
-                  <rect x="18" y="10" width="2" height="2"/>
-                  <rect x="22" y="10" width="2" height="2"/>
-                  <rect x="26" y="10" width="2" height="2"/>
-                  <rect x="30" y="10" width="2" height="2"/>
-
-                  <rect x="2" y="14" width="2" height="2"/>
-                  <rect x="10" y="14" width="2" height="2"/>
-                  <rect x="14" y="14" width="2" height="2"/>
-                  <rect x="22" y="14" width="2" height="2"/>
-                  <rect x="30" y="14" width="2" height="2"/>
-
-                  <rect x="9" y="18" width="2" height="2"/>
-                  <rect x="13" y="18" width="2" height="2"/>
-                  <rect x="17" y="18" width="2" height="2"/>
-                  <rect x="21" y="18" width="2" height="2"/>
-                  <rect x="25" y="18" width="2" height="2"/>
-
-                  <rect x="9" y="26" width="2" height="2"/>
-                  <rect x="13" y="26" width="2" height="2"/>
-                  <rect x="17" y="26" width="2" height="2"/>
-                  <rect x="21" y="26" width="2" height="2"/>
-                </svg>
-                <span class="qr-label">OFFLINE VALID</span>
+                <span class="qr-label">SHV MITGLIED</span>
               </div>
             </div>
 
             <div class="card-footer-line">
               <div class="footer-col">
-                <span class="card-sub-lbl">${t.profile.birthDate}</span>
-                <span class="card-sub-val">${p.birthDate}</span>
+                <span class="card-sub-lbl">Kategorie</span>
+                <span class="card-sub-val">${p.memberCategory}</span>
               </div>
               <div class="footer-col">
                 <span class="card-sub-lbl">Kanton</span>
@@ -118,7 +133,7 @@ export function renderProfileView(container) {
         </div>
       </div>
 
-      <!-- 2. OFFICIAL PILOT LICENSE RATINGS -->
+      <!-- 2. PILOT RATINGS / BREVET -->
       <section class="profile-section">
         <h3 class="section-heading-sm">Berechtigungen & Lizenzen</h3>
         <div class="ratings-card-box">
@@ -151,71 +166,13 @@ export function renderProfileView(container) {
           </div>
         </div>
       </section>
-
-      <!-- 4. EDIT PROFILE FORM -->
-      <section class="profile-section">
-        <h3 class="section-heading-sm">Pilotendaten bearbeiten</h3>
-        <form id="edit-profile-form" class="edit-profile-card">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Vorname</label>
-              <input type="text" name="firstName" value="${p.firstName}" required />
-            </div>
-            <div class="form-group">
-              <label>Nachname</label>
-              <input type="text" name="lastName" value="${p.lastName}" required />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>SHV-Nummer</label>
-              <input type="text" name="shvNumber" value="${p.shvNumber}" required />
-            </div>
-            <div class="form-group">
-              <label>Geburtsdatum</label>
-              <input type="text" name="birthDate" value="${p.birthDate}" required />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Stammclub</label>
-              <input type="text" name="club" value="${p.club}" required />
-            </div>
-            <div class="form-group">
-              <label>Kanton</label>
-              <input type="text" name="canton" value="${p.canton}" required />
-            </div>
-          </div>
-          <div class="text-right mt-2">
-            <button type="submit" class="btn-primary">Änderungen speichern</button>
-          </div>
-        </form>
-      </section>
     </div>
   `;
 
-  // Attach handlers
-  container.querySelectorAll('.btn-preset').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const preset = btn.getAttribute('data-preset');
-      store.setProfilePreset(preset);
-      renderProfileView(container);
-    });
-  });
-
-  const form = container.querySelector('#edit-profile-form');
-  if (form) {
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const fd = new FormData(form);
-      store.updateProfile({
-        firstName: fd.get('firstName'),
-        lastName: fd.get('lastName'),
-        shvNumber: fd.get('shvNumber'),
-        birthDate: fd.get('birthDate'),
-        club: fd.get('club'),
-        canton: fd.get('canton'),
-      });
+  const btnLogout = container.querySelector('#btn-logout');
+  if (btnLogout) {
+    btnLogout.addEventListener('click', () => {
+      store.logout();
       renderProfileView(container);
     });
   }

@@ -43,12 +43,11 @@ app.get('/api/measurements', async (req, res) => {
     }
     throw new Error(`Upstream returned ${resp.status}`);
   } catch (err) {
-    console.warn('[Server] Upstream measurements failed, checking cache or fallback:', err.message);
+    console.error('[Server] Upstream live measurements error:', err.message);
     if (cache.measurements.data) {
       return res.json(cache.measurements.data);
     }
-    // Return sample offline measurements
-    return res.json(getFallbackMeasurements());
+    return res.status(503).json({ error: 'Live-Messwerte vorübergehend nicht erreichbar', features: [] });
   }
 });
 
@@ -74,11 +73,11 @@ app.get('/api/webcams', async (req, res) => {
     }
     throw new Error(`Upstream returned ${resp.status}`);
   } catch (err) {
-    console.warn('[Server] Upstream webcams failed, using fallback:', err.message);
+    console.error('[Server] Upstream webcams error:', err.message);
     if (cache.webcams.data) {
       return res.json(cache.webcams.data);
     }
-    return res.json(getFallbackWebcams());
+    return res.status(503).json({ error: 'Webcams vorübergehend nicht erreichbar', webcams: [] });
   }
 });
 
@@ -274,96 +273,6 @@ app.get('/api/dabs', (req, res) => {
     notesEn: 'Published daily at 16:00 LT for the next day. Mandatory consultation prior to cross-country flights!'
   });
 });
-
-// Fallback Mock Data Generators
-function getFallbackMeasurements() {
-  return {
-    type: 'FeatureCollection',
-    features: [
-      {
-        id: 'meteo_swiss:KLO',
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [8.536, 47.48] },
-        properties: {
-          name: 'Zürich / Kloten',
-          stationIdentifier: 'KLO',
-          altitude: 426,
-          temperatureValue: 288.15,
-          windSpeedValue: 3.2,
-          windGustValue: 5.8,
-          windDirectionValue: 240,
-          pressureStandardMslValue: 1018.5,
-          relativeHumidityValue: 68
-        }
-      },
-      {
-        id: 'meteo_swiss:LUG',
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [8.96, 46.0] },
-        properties: {
-          name: 'Lugano',
-          stationIdentifier: 'LUG',
-          altitude: 273,
-          temperatureValue: 291.65,
-          windSpeedValue: 1.8,
-          windGustValue: 3.5,
-          windDirectionValue: 170,
-          pressureStandardMslValue: 1021.2,
-          relativeHumidityValue: 55
-        }
-      },
-      {
-        id: 'meteo_swiss:INT',
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [7.87, 46.67] },
-        properties: {
-          name: 'Interlaken',
-          stationIdentifier: 'INT',
-          altitude: 577,
-          temperatureValue: 289.45,
-          windSpeedValue: 2.5,
-          windGustValue: 4.9,
-          windDirectionValue: 290,
-          pressureStandardMslValue: 1018.8,
-          relativeHumidityValue: 62
-        }
-      },
-      {
-        id: 'meteo_swiss:GUT',
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [8.62, 46.65] },
-        properties: {
-          name: 'Gütsch ob Andermatt',
-          stationIdentifier: 'GUT',
-          altitude: 2287,
-          temperatureValue: 275.15,
-          windSpeedValue: 7.8,
-          windGustValue: 12.4,
-          windDirectionValue: 230,
-          pressureStandardMslValue: 1017.0,
-          relativeHumidityValue: 80
-        }
-      }
-    ]
-  };
-}
-
-function getFallbackWebcams() {
-  return {
-    webcams: [
-      {
-        identifier: 'meteo_swiss:DIS',
-        name: 'Disentis',
-        latitude: 46.706,
-        longitude: 8.853,
-        altitudeM: 1203,
-        providerDisplayName: 'MeteoSchweiz',
-        latestImageUrl: 'https://webcam-prod.ubmeteo.io/v1/webcams/meteo_swiss:DIS/image/latest',
-        thumbnailUrl: 'https://webcam-prod.ubmeteo.io/v1/webcams/meteo_swiss:DIS/image/thumbnail'
-      }
-    ]
-  };
-}
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[SHV-Backend] Running on http://0.0.0.0:${PORT}`);

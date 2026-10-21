@@ -2148,6 +2148,136 @@ body {
   color: var(--text-muted);
 }
 
+/* ==========================================================
+   MEMBER BLOCKER & LOGIN SCREEN
+   ========================================================== */
+.member-blocker-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-strong);
+  border-radius: 24px;
+  padding: 40px 24px;
+  max-width: 500px;
+  margin: 30px auto;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.blocker-icon-badge {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(213, 43, 30, 0.12);
+  border: 1px solid rgba(213, 43, 30, 0.3);
+  color: var(--shv-red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.blocker-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 12px 0 8px;
+  color: var(--text-primary);
+}
+
+.blocker-text {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 24px;
+  max-width: 420px;
+}
+
+.login-form-box {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.login-form-box .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-form-box label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.login-form-box input {
+  height: 46px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0 14px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.login-form-box input:focus {
+  border-color: var(--shv-red);
+}
+
+.btn-login-submit {
+  height: 48px;
+  background: var(--shv-red);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+  margin-top: 6px;
+}
+
+.btn-login-submit:hover {
+  background: var(--shv-red-hover);
+  transform: translateY(-1px);
+}
+
+.login-links-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 0.82rem;
+}
+
+.login-links-row a {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s;
+}
+
+.login-links-row a:hover {
+  color: var(--text-primary);
+}
+
+.blocker-actions-column {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .ins-top {
   display: flex;
   justify-content: space-between;

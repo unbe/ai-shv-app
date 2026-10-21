@@ -243,7 +243,12 @@ export class SafetyView {
 
           <!-- Flights Table / List -->
           <div class="flights-list">
-            ${flights.map(f => `
+            ${flights.length === 0 ? `
+              <div class="empty-state-card" style="text-align: center; padding: 36px 16px; background: var(--bg-primary); border-radius: 14px; border: 1px dashed var(--border-color);">
+                <p style="font-weight: 700; margin: 0 0 6px; color: var(--text-primary);">Noch keine Flüge im Flugbuch erfasst</p>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">Erfasse deinen ersten Flug mit «+ Flug erfassen» oben rechts.</p>
+              </div>
+            ` : flights.map(f => `
               <div class="flight-item-card">
                 <div class="fl-top">
                   <div>
