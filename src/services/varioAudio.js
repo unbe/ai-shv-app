@@ -13,12 +13,20 @@ class VarioAudio {
   }
 
   init() {
-    if (!this.ctx) {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AudioContext();
-    }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+    try {
+      if (!this.ctx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) {
+          console.warn('[VarioAudio] Web Audio API is not supported in this browser.');
+          return;
+        }
+        this.ctx = new AudioContext();
+      }
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch((err) => console.warn('[VarioAudio] AudioContext resume failed:', err));
+      }
+    } catch (err) {
+      console.error('[VarioAudio] Failed to initialize AudioContext:', err);
     }
   }
 
@@ -45,7 +53,9 @@ class VarioAudio {
       try {
         this.osc.stop();
         this.osc.disconnect();
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[VarioAudio] Error stopping oscillator:', e);
+      }
       this.osc = null;
     }
   }
@@ -59,11 +69,13 @@ class VarioAudio {
       try {
         this.osc.stop();
         this.osc.disconnect();
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[VarioAudio] Error stopping oscillator in updateTone:', e);
+      }
       this.osc = null;
     }
 
-    if (!this.isPlaying) return;
+    if (!this.isPlaying || !this.ctx) return;
 
     const rate = this.currentRate;
 
@@ -76,7 +88,7 @@ class VarioAudio {
       const beepDurationMs = Math.min(cycleMs * 0.55, 180);
 
       const playBeep = () => {
-        if (!this.isPlaying) return;
+        if (!this.isPlaying || !this.ctx) return;
         try {
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
@@ -94,7 +106,9 @@ class VarioAudio {
 
           osc.start();
           osc.stop(this.ctx.currentTime + (beepDurationMs / 1000) + 0.02);
-        } catch (e) {}
+        } catch (e) {
+          console.warn('[VarioAudio] Error generating beep:', e);
+        }
       };
 
       playBeep();
@@ -116,7 +130,9 @@ class VarioAudio {
         this.gain.connect(this.ctx.destination);
 
         this.osc.start();
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[VarioAudio] Error generating sink tone:', e);
+      }
     }
     // 3. Deadband: -2.0 < rate < 0.15 -> Silent
   }

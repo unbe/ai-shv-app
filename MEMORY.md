@@ -44,4 +44,11 @@ A high-performance, responsive web reproduction of the official **SHV FSVL** (Sc
   2. Right-side Floating Action Button (FAB) stack (`.map-fab-column`) for Layers/Basemaps, Wind Compass filter, and Swiss recentering.
   3. Slide-out flyout drawers (`.map-drawer`) with smooth iOS/Material toggle switches and 8-direction compass dial.
   4. Global removal of awkward browser scrollbars (`scrollbar-width: none; -webkit-scrollbar: display: none`).
+- **Live-Karte Navigation & Desktop Grid Layout**:
+  - The desktop layout (`min-width: 768px`) previously assigned `grid-area: nav` to `.bottom-nav` instead of its parent grid child `#bottom-nav-container`, resulting in misplaced sidebar elements and overlapping pointer event areas. Fixed by assigning grid areas to `#header-container`, `#bottom-nav-container`, and `#view-container`.
+  - Clicking the active "Live-Karte" nav icon when already on the map now triggers a `TAB_REPEAT` event that calls `resetView()`, re-centering Switzerland (`[46.8182, 8.2275], zoom 9`), closing flyout drawers, clearing search and wind filters, and calling `map.invalidateSize()`.
+- **Zero Swallowed Errors & Global Monitoring**:
+  - Attached global `window.addEventListener('error')` and `window.addEventListener('unhandledrejection')` listeners in `src/main.js` so all browser errors and unhandled promise rejections are logged with full stack traces.
+  - Replaced silent `catch (e) {}` blocks across `ShvApi`, `AppState`, `VarioAudio`, and views with informative `console.error` logs.
+  - Added in-memory dataset caching in `ShvApi` for `flyingsites`, `airspaces`, and `wildschutz` to eliminate redundant network roundtrips when navigating between views.
 - **Offline / Flight Mode Reliability**: Paragliders frequently launch in alpine areas with weak 4G/5G; local storage caching for sites, checklists, pilot license, and emergency contacts ensures offline access.

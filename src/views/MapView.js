@@ -428,42 +428,83 @@ export class MapView {
         store.selectWebcam(null);
       }
     });
+
+    // Ensure map tiles recalculate on next frame
+    requestAnimationFrame(() => {
+      if (this.map) {
+        this.map.invalidateSize();
+      }
+    });
+  }
+
+  resetView() {
+    if (this.map) {
+      this.map.setView([46.8182, 8.2275], 9);
+      this.map.invalidateSize();
+    }
+    const layersDrawer = this.container.querySelector('#map-layers-drawer');
+    const windDrawer = this.container.querySelector('#map-wind-drawer');
+    if (layersDrawer) layersDrawer.classList.add('hidden');
+    if (windDrawer) windDrawer.classList.add('hidden');
+
+    const searchInput = this.container.querySelector('#map-search-input');
+    if (searchInput) searchInput.value = '';
   }
 
   async loadData() {
+    // 1. Flying sites
     try {
-      // 1. Flying sites
       this.rawFlyingSites = await ShvApi.getFlyingSites();
       this.renderFlyingSites();
+    } catch (err) {
+      console.error('[MapView] Error loading flying sites:', err);
+    }
 
-      // 2. Airspaces
+    // 2. Airspaces
+    try {
       this.rawAirspaces = await ShvApi.getAirspaces();
-      if (this.rawAirspaces) {
+      if (this.rawAirspaces && this.airspaceLayer) {
         this.airspaceLayer.addData(this.rawAirspaces);
       }
+    } catch (err) {
+      console.error('[MapView] Error loading airspaces:', err);
+    }
 
-      // 3. Wildlife zones
+    // 3. Wildlife zones
+    try {
       this.rawWildschutz = await ShvApi.getWildschutz();
-      if (this.rawWildschutz) {
+      if (this.rawWildschutz && this.wildschutzLayer) {
         this.wildschutzLayer.addData(this.rawWildschutz);
       }
+    } catch (err) {
+      console.error('[MapView] Error loading wildschutz:', err);
+    }
 
-      // 4. Weather stations & measurements
+    // 4. Weather stations & measurements
+    try {
       this.rawMeasurements = await ShvApi.getMeasurements();
       store.state.measurements = this.rawMeasurements;
       this.renderStations();
+    } catch (err) {
+      console.error('[MapView] Error loading measurements:', err);
+    }
 
-      // 5. Foehn pressure differences
+    // 5. Foehn pressure differences
+    try {
       const foehnData = await ShvApi.getFoehn();
       store.state.foehn = foehnData;
       this.renderFoehnAxis(foehnData);
+    } catch (err) {
+      console.error('[MapView] Error loading foehn axis:', err);
+    }
 
-      // 6. Webcams
+    // 6. Webcams
+    try {
       this.rawWebcams = await ShvApi.getWebcams();
       store.state.webcams = this.rawWebcams;
       this.renderWebcams();
     } catch (err) {
-      console.error('[MapView] Error loading spatial datasets:', err);
+      console.error('[MapView] Error loading webcams:', err);
     }
   }
 
@@ -854,6 +895,8 @@ export class MapView {
   }
 
   syncState(state) {
+    if (!this.map) return;
+
     // 1. Base Map Switcher
     if (this.currentBaseLayer !== this.baseLayers[state.baseMap]) {
       if (this.currentBaseLayer) this.map.removeLayer(this.currentBaseLayer);

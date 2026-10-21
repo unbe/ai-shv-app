@@ -1,40 +1,85 @@
+// In-memory cache for static spatial datasets to prevent repeat download delays
+let cachedFlyingSites = null;
+let cachedAirspaces = null;
+let cachedWildschutz = null;
+
 export class ShvApi {
   static async getFlyingSites() {
+    if (cachedFlyingSites) return cachedFlyingSites;
     try {
       const resp = await fetch('/data/flyingsites.geojson');
-      if (resp.ok) return await resp.json();
+      if (resp.ok) {
+        cachedFlyingSites = await resp.json();
+        return cachedFlyingSites;
+      }
+      console.warn('[ShvApi.getFlyingSites] Local fetch returned status:', resp.status);
     } catch (e) {
-      console.warn('Local flying sites load failed, trying live endpoint', e);
+      console.warn('[ShvApi.getFlyingSites] Local fetch failed, trying live CDN fallback:', e);
     }
-    // Fallback direct to live CDN
-    const cdnResp = await fetch('https://shv-app-static-prod.ubmeteo.io/v1/flyingsites.geojson');
-    return await cdnResp.json();
+    try {
+      const cdnResp = await fetch('https://shv-app-static-prod.ubmeteo.io/v1/flyingsites.geojson');
+      if (!cdnResp.ok) throw new Error(`CDN status ${cdnResp.status}`);
+      cachedFlyingSites = await cdnResp.json();
+      return cachedFlyingSites;
+    } catch (err) {
+      console.error('[ShvApi.getFlyingSites] Failed to load flying sites from both local and CDN:', err);
+      throw err;
+    }
   }
 
   static async getAirspaces() {
+    if (cachedAirspaces) return cachedAirspaces;
     try {
       const resp = await fetch('/data/airspaces.geojson');
-      if (resp.ok) return await resp.json();
-    } catch (e) {}
-    const cdnResp = await fetch('https://shv-app-static-prod.ubmeteo.io/v1/airspaces/shv.geojson');
-    return await cdnResp.json();
+      if (resp.ok) {
+        cachedAirspaces = await resp.json();
+        return cachedAirspaces;
+      }
+      console.warn('[ShvApi.getAirspaces] Local fetch returned status:', resp.status);
+    } catch (e) {
+      console.warn('[ShvApi.getAirspaces] Local fetch failed, trying live CDN fallback:', e);
+    }
+    try {
+      const cdnResp = await fetch('https://shv-app-static-prod.ubmeteo.io/v1/airspaces/shv.geojson');
+      if (!cdnResp.ok) throw new Error(`CDN status ${cdnResp.status}`);
+      cachedAirspaces = await cdnResp.json();
+      return cachedAirspaces;
+    } catch (err) {
+      console.error('[ShvApi.getAirspaces] Failed to load airspaces from both local and CDN:', err);
+      throw err;
+    }
   }
 
   static async getWildschutz() {
+    if (cachedWildschutz) return cachedWildschutz;
     try {
       const resp = await fetch('/data/wildschutz.geojson');
-      if (resp.ok) return await resp.json();
-    } catch (e) {}
-    const cdnResp = await fetch('https://shv-app-static-prod.ubmeteo.io/v1/wildschutz/shv.geojson');
-    return await cdnResp.json();
+      if (resp.ok) {
+        cachedWildschutz = await resp.json();
+        return cachedWildschutz;
+      }
+      console.warn('[ShvApi.getWildschutz] Local fetch returned status:', resp.status);
+    } catch (e) {
+      console.warn('[ShvApi.getWildschutz] Local fetch failed, trying live CDN fallback:', e);
+    }
+    try {
+      const cdnResp = await fetch('https://shv-app-static-prod.ubmeteo.io/v1/wildschutz/shv.geojson');
+      if (!cdnResp.ok) throw new Error(`CDN status ${cdnResp.status}`);
+      cachedWildschutz = await cdnResp.json();
+      return cachedWildschutz;
+    } catch (err) {
+      console.error('[ShvApi.getWildschutz] Failed to load wildschutz from both local and CDN:', err);
+      throw err;
+    }
   }
 
   static async getMeasurements() {
     try {
       const resp = await fetch('/api/measurements');
       if (resp.ok) return await resp.json();
+      console.error('[ShvApi.getMeasurements] HTTP error:', resp.status, resp.statusText);
     } catch (e) {
-      console.warn('API measurements failed', e);
+      console.error('[ShvApi.getMeasurements] Network error:', e);
     }
     return null;
   }
@@ -43,8 +88,9 @@ export class ShvApi {
     try {
       const resp = await fetch('/api/webcams');
       if (resp.ok) return await resp.json();
+      console.error('[ShvApi.getWebcams] HTTP error:', resp.status, resp.statusText);
     } catch (e) {
-      console.warn('API webcams failed', e);
+      console.error('[ShvApi.getWebcams] Network error:', e);
     }
     return null;
   }
@@ -53,8 +99,9 @@ export class ShvApi {
     try {
       const resp = await fetch('/api/foehn');
       if (resp.ok) return await resp.json();
+      console.error('[ShvApi.getFoehn] HTTP error:', resp.status, resp.statusText);
     } catch (e) {
-      console.warn('API foehn failed', e);
+      console.error('[ShvApi.getFoehn] Network error:', e);
     }
     return null;
   }
@@ -63,8 +110,9 @@ export class ShvApi {
     try {
       const resp = await fetch('/api/emagram/sounding');
       if (resp.ok) return await resp.json();
+      console.error('[ShvApi.getEmagramSounding] HTTP error:', resp.status, resp.statusText);
     } catch (e) {
-      console.warn('API emagram failed', e);
+      console.error('[ShvApi.getEmagramSounding] Network error:', e);
     }
     return null;
   }
@@ -80,8 +128,9 @@ export class ShvApi {
         }),
       });
       if (resp.ok) return await resp.json();
+      console.error('[ShvApi.calculateEmagram] HTTP error:', resp.status, resp.statusText);
     } catch (e) {
-      console.warn('Calculate emagram failed', e);
+      console.error('[ShvApi.calculateEmagram] Network error:', e);
     }
     return null;
   }
@@ -90,7 +139,10 @@ export class ShvApi {
     try {
       const resp = await fetch('/api/dabs');
       if (resp.ok) return await resp.json();
-    } catch (e) {}
+      console.error('[ShvApi.getDabs] HTTP error:', resp.status, resp.statusText);
+    } catch (e) {
+      console.error('[ShvApi.getDabs] Network error:', e);
+    }
     return null;
   }
 }

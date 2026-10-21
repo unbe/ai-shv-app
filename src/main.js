@@ -10,6 +10,19 @@ import { SafetyView } from './views/SafetyView.js';
 import { renderProfileView } from './views/ProfileView.js';
 import { ShvApi } from './services/api.js';
 
+// Global error monitoring to prevent any errors from being swallowed
+window.addEventListener('error', (event) => {
+  console.error('[Global Error]', event.error || event.message, {
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+  });
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[Unhandled Promise Rejection]', event.reason);
+});
+
 class App {
   constructor() {
     this.headerContainer = document.getElementById('header-container');
@@ -24,18 +37,34 @@ class App {
   }
 
   async init() {
-    // Initial fetch of background Foehn data for header pill
-    try {
-      const foehnData = await ShvApi.getFoehn();
-      store.state.foehn = foehnData;
-    } catch (e) {}
-
-    // Initial render
+    // 1. Render UI immediately so app is instantly interactive
     this.renderShell();
     this.switchView(store.state.activeTab);
 
-    // Subscribe to state updates
-    store.subscribe((state) => {
+    // 2. Fetch background Foehn data for header pill asynchronously
+    ShvApi.getFoehn()
+      .then((foehnData) => {
+        if (foehnData) {
+          store.state.foehn = foehnData;
+          renderHeader(this.headerContainer);
+        }
+      })
+      .catch((e) => {
+        console.error('[App.init] Failed to fetch background foehn data:', e);
+      });
+
+    // 3. Subscribe to state updates
+    store.subscribe((state, meta) => {
+      // Handle repeat clicks on active tab (e.g. clicking Live-Karte resets map)
+      if (meta && meta.type === 'TAB_REPEAT') {
+        if (meta.tab === 'map') {
+          if (this.currentViewInstance && typeof this.currentViewInstance.resetView === 'function') {
+            this.currentViewInstance.resetView();
+          }
+        }
+        return;
+      }
+
       // Re-render shell if language or theme changed
       if (state.lang !== this.lang || state.theme !== this.theme) {
         this.renderShell();
@@ -66,37 +95,41 @@ class App {
   }
 
   switchView(tab) {
-    if (this.currentViewInstance && typeof this.currentViewInstance.unmount === 'function') {
-      this.currentViewInstance.unmount();
-    }
-    this.currentViewInstance = null;
-    this.activeTab = tab;
-    this.viewContainer.innerHTML = '';
+    try {
+      if (this.currentViewInstance && typeof this.currentViewInstance.unmount === 'function') {
+        this.currentViewInstance.unmount();
+      }
+      this.currentViewInstance = null;
+      this.activeTab = tab;
+      this.viewContainer.innerHTML = '';
 
-    switch (tab) {
-      case 'map':
-        this.currentViewInstance = new MapView(this.viewContainer);
-        this.currentViewInstance.mount();
-        break;
-      case 'weather':
-        this.currentViewInstance = new WeatherView(this.viewContainer);
-        this.currentViewInstance.mount();
-        break;
-      case 'forecast':
-        this.currentViewInstance = new ForecastView(this.viewContainer);
-        this.currentViewInstance.mount();
-        break;
-      case 'safety':
-        this.currentViewInstance = new SafetyView(this.viewContainer);
-        this.currentViewInstance.mount();
-        break;
-      case 'profile':
-        renderProfileView(this.viewContainer);
-        break;
-      default:
-        this.currentViewInstance = new MapView(this.viewContainer);
-        this.currentViewInstance.mount();
-        break;
+      switch (tab) {
+        case 'map':
+          this.currentViewInstance = new MapView(this.viewContainer);
+          this.currentViewInstance.mount();
+          break;
+        case 'weather':
+          this.currentViewInstance = new WeatherView(this.viewContainer);
+          this.currentViewInstance.mount();
+          break;
+        case 'forecast':
+          this.currentViewInstance = new ForecastView(this.viewContainer);
+          this.currentViewInstance.mount();
+          break;
+        case 'safety':
+          this.currentViewInstance = new SafetyView(this.viewContainer);
+          this.currentViewInstance.mount();
+          break;
+        case 'profile':
+          renderProfileView(this.viewContainer);
+          break;
+        default:
+          this.currentViewInstance = new MapView(this.viewContainer);
+          this.currentViewInstance.mount();
+          break;
+      }
+    } catch (err) {
+      console.error(`[App.switchView] Error mounting view "${tab}":`, err);
     }
   }
 }

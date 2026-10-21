@@ -76,9 +76,12 @@ export function renderBottomNav(container) {
   `;
 
   container.querySelectorAll('.nav-item').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
       const tabId = btn.getAttribute('data-tab');
-      store.setTab(tabId);
+      if (tabId) {
+        store.setTab(tabId);
+      }
     });
   });
 }

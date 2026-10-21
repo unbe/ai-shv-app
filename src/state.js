@@ -64,7 +64,9 @@ class AppState {
     try {
       const data = localStorage.getItem('shv_flights');
       if (data) return JSON.parse(data);
-    } catch (e) {}
+    } catch (e) {
+      console.error('[AppState.loadSavedLogs] Failed to parse saved flights from localStorage:', e);
+    }
 
     // Default sample flights in Switzerland
     return [
@@ -111,7 +113,9 @@ class AppState {
     try {
       const data = localStorage.getItem('shv_profile');
       if (data) return JSON.parse(data);
-    } catch (e) {}
+    } catch (e) {
+      console.error('[AppState.loadSavedProfile] Failed to parse saved profile from localStorage:', e);
+    }
 
     return {
       shvNumber: '58412',
@@ -135,8 +139,24 @@ class AppState {
   }
 
   notify() {
-    for (const listener of this.listeners) {
-      listener(this.state);
+    const listenersCopy = Array.from(this.listeners);
+    for (const listener of listenersCopy) {
+      try {
+        listener(this.state);
+      } catch (err) {
+        console.error('[AppState.notify] Listener threw error:', err);
+      }
+    }
+  }
+
+  notifyTabRepeat(tab) {
+    const listenersCopy = Array.from(this.listeners);
+    for (const listener of listenersCopy) {
+      try {
+        listener(this.state, { type: 'TAB_REPEAT', tab });
+      } catch (err) {
+        console.error('[AppState.notifyTabRepeat] Listener threw error:', err);
+      }
     }
   }
 
@@ -145,7 +165,23 @@ class AppState {
   }
 
   setTab(tab) {
+    if (this.state.activeTab === tab) {
+      if (tab === 'map') {
+        this.resetMapState();
+      }
+      this.notifyTabRepeat(tab);
+      return;
+    }
     this.state.activeTab = tab;
+    this.notify();
+  }
+
+  resetMapState() {
+    this.state.searchQuery = '';
+    this.state.windFilter = [];
+    this.state.selectedSite = null;
+    this.state.selectedStation = null;
+    this.state.selectedWebcam = null;
     this.notify();
   }
 
