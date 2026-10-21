@@ -256,10 +256,20 @@ The SHV WMS API (`v1/wms/person`) and Kotlin models use specialized naming conve
 
 ### Text Forecasts & Synoptic Weather Charts
 The application integrates official MeteoSchweiz and SHV daily text prognoses directly from Verband infrastructure:
-- **Text Forecasts**: `https://shv-app-ws-prod.shv-app.ch/v1/text/forecast/{lang}.json` (3-day regional outlook for Deutschschweiz, Romandie, and Ticino in DE, FR, IT).
+- **Text Forecasts**: `https://shv-app-ws-prod.shv-app.ch/v1/text/forecast/{lang}.json` (regional outlook for Switzerland in DE, FR, IT).
+  - The JSON `text` map contains 3 **Regional Text Forecasts** (each including complete multi-day outlooks: Heute, Morgen, Übermorgen & Trend):
+    - Key `'0'`: **Deutschschweiz, Nord- und Mittelbünden** (Suisse alémanique / Svizzera tedesca)
+    - Key `'1'`: **Alpensüdseite und das Engadin** (Sud des Alpes / Sud delle Alpi)
+    - Key `'2'`: **Westschweiz und das Wallis** (Suisse romande / Svizzera romanda)
 - **Isobar Charts**: `https://shv-app-ws-prod.shv-app.ch/v1/text/isobaren/{lang}.svg` (Synoptic European surface pressure field and fronts).
 - **Timeseries Telemetry**: `https://weather-ws-prod.ubmeteo.io/v1/measurements/timeseries/{stationId}?parameters=...` (24-hour recorded historical telemetry).
-- **Dashboard & Dedicated Navigation**: Textprognosen are featured directly on the Weather dashboard (`WeatherView.js`) with an expandable synopsis card and day preview, as well as a dedicated full-screen tab (`ForecastView.js` / `Textprognosen`) matching the native app (`home_screen_product_text`).
+- **Dashboard & Dedicated Navigation**: Textprognosen are featured directly on the Weather dashboard (`WeatherView.js`) with an expandable regional synopsis card and region tabs, as well as a dedicated full-screen tab (`ForecastView.js` / `Textprognosen`) matching the native app (`home_screen_product_text`).
+
+### Map Controls Architecture & Separation of Concerns
+To prevent duplicate controls across the UI:
+1. **Top Bar (Meteo Overlays)**: Exclusively controls the active `LiveMapMeteoType` mode (`🍃 Wind`, `🌡️ Temp`, `⚡ Föhn / Δp`, `📷 Webcams`, `✕ Aus`).
+2. **Right Drawer (Aviation Layers & Base Map)**: Controls static aviation zones (Startplätze, Landeplätze, Lufträume CTR/TMA, Wildruhezonen) and Swisstopo basemaps (Pixelkarte, Luftbild, Grau, OSM). Redundant weather checkboxes were eliminated from the drawer.
+3. **Right FABs**: Fast-action triggers for Layers Drawer, Launch Site Wind Suitability (compass filter), and Switzerland Re-centering.
 
 ---
 

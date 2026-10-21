@@ -3005,12 +3005,15 @@ body {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
+.region-pills-row,
 .day-pills-row {
   display: flex;
   gap: 8px;
   margin: 16px 0 20px 0;
+  flex-wrap: wrap;
 }
 
+.region-pill,
 .day-pill {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -3023,11 +3026,13 @@ body {
   transition: all 0.2s ease;
 }
 
+.region-pill:hover,
 .day-pill:hover {
   color: var(--text-main);
   border-color: var(--text-muted);
 }
 
+.region-pill.active,
 .day-pill.active {
   background: var(--shv-blue);
   color: #FFFFFF;

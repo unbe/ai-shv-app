@@ -5,7 +5,7 @@ export class ForecastView {
   constructor(container) {
     this.container = container;
     this.forecastData = null;
-    this.activeDay = '0'; // '0' | '1' | '2'
+    this.activeRegion = '0'; // '0': Deutschschweiz, '1': Alpensüdseite & Engadin, '2': Westschweiz & Wallis
     this.activeSection = 'text'; // 'text' | 'isobaren' | 'soundings'
     this.loading = false;
     this.error = null;
@@ -49,24 +49,40 @@ export class ForecastView {
         })
       : null;
 
-    let dayContentHtml = '';
-    if (this.forecastData?.text && this.forecastData.text[this.activeDay]) {
-      const rawHtml = this.forecastData.text[this.activeDay];
+    let regionContentHtml = '';
+    if (this.forecastData?.text && this.forecastData.text[this.activeRegion]) {
+      const rawHtml = this.forecastData.text[this.activeRegion];
       // Extract content from body
       const bodyMatch = rawHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
       const innerContent = bodyMatch ? bodyMatch[1] : rawHtml;
-      dayContentHtml = `
+      regionContentHtml = `
         <div class="prognosis-text-body">
           ${innerContent}
         </div>
       `;
     }
 
-    const dayLabels = {
-      de: { '0': 'Heute', '1': 'Morgen', '2': 'Übermorgen' },
-      fr: { '0': "Aujourd'hui", '1': 'Demain', '2': 'Après-demain' },
-      it: { '0': 'Oggi', '1': 'Domani', '2': 'Dopodomani' },
-    }[lang] || { '0': 'Heute', '1': 'Morgen', '2': 'Übermorgen' };
+    const regionLabels = {
+      de: {
+        '0': 'Deutschschweiz & Graubünden',
+        '1': 'Alpensüdseite & Engadin',
+        '2': 'Westschweiz & Wallis',
+      },
+      fr: {
+        '0': 'Suisse alémanique & Grisons',
+        '1': 'Sud des Alpes & Engadine',
+        '2': 'Suisse romande & Valais',
+      },
+      it: {
+        '0': 'Svizzera tedesca & Grigioni',
+        '1': 'Sud delle Alpi & Engadina',
+        '2': 'Svizzera romanda & Vallese',
+      },
+    }[lang] || {
+      '0': 'Deutschschweiz & Graubünden',
+      '1': 'Alpensüdseite & Engadin',
+      '2': 'Westschweiz & Wallis',
+    };
 
     this.container.innerHTML = `
       <div class="forecast-view-wrapper">
@@ -111,11 +127,11 @@ export class ForecastView {
               </div>
             </div>
 
-            <!-- Day Tabs -->
-            <div class="day-pills-row">
-              <button data-day="0" class="day-pill ${this.activeDay === '0' ? 'active' : ''}">${dayLabels['0']}</button>
-              <button data-day="1" class="day-pill ${this.activeDay === '1' ? 'active' : ''}">${dayLabels['1']}</button>
-              <button data-day="2" class="day-pill ${this.activeDay === '2' ? 'active' : ''}">${dayLabels['2']}</button>
+            <!-- Region Switcher Tabs -->
+            <div class="region-pills-row">
+              <button data-region="0" class="region-pill ${this.activeRegion === '0' ? 'active' : ''}">${regionLabels['0']}</button>
+              <button data-region="1" class="region-pill ${this.activeRegion === '1' ? 'active' : ''}">${regionLabels['1']}</button>
+              <button data-region="2" class="region-pill ${this.activeRegion === '2' ? 'active' : ''}">${regionLabels['2']}</button>
             </div>
 
             ${this.loading ? `
@@ -127,7 +143,7 @@ export class ForecastView {
               <div class="error-notice">${this.error}</div>
             ` : `
               <div class="forecast-prognosis-container">
-                ${dayContentHtml}
+                ${regionContentHtml}
               </div>
             `}
           </div>
@@ -203,10 +219,10 @@ export class ForecastView {
       });
     });
 
-    // Day Pills Switcher
-    this.container.querySelectorAll('.day-pill').forEach(btn => {
+    // Region Pills Switcher
+    this.container.querySelectorAll('.region-pill').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.activeDay = btn.getAttribute('data-day');
+        this.activeRegion = btn.getAttribute('data-region');
         this.render();
       });
     });

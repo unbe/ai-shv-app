@@ -217,33 +217,12 @@ export class MapView {
                   <input type="checkbox" data-layer="wildschutz" ${layers.wildschutz ? 'checked' : ''} />
                   <span class="switch-toggle"></span>
                 </label>
+              </div>
 
-                <label class="layer-switch-item">
-                  <div class="layer-switch-label">
-                    <span class="chip-dot dot-station"></span>
-                    <span>Wetterstationen & Wind</span>
-                  </div>
-                  <input type="checkbox" data-layer="stations" ${layers.stations ? 'checked' : ''} />
-                  <span class="switch-toggle"></span>
-                </label>
-
-                <label class="layer-switch-item">
-                  <div class="layer-switch-label">
-                    <span class="chip-dot" style="background: #EF4444;"></span>
-                    <span>Föhn-Achse (Gotthard)</span>
-                  </div>
-                  <input type="checkbox" data-layer="foehnAxis" ${layers.foehnAxis ? 'checked' : ''} />
-                  <span class="switch-toggle"></span>
-                </label>
-
-                <label class="layer-switch-item">
-                  <div class="layer-switch-label">
-                    <span class="chip-dot dot-webcam"></span>
-                    <span>Webcams</span>
-                  </div>
-                  <input type="checkbox" data-layer="webcams" ${layers.webcams ? 'checked' : ''} />
-                  <span class="switch-toggle"></span>
-                </label>
+              <div class="drawer-meteo-hint" style="margin-top: 14px; padding: 10px 12px; background: rgba(0, 137, 207, 0.08); border: 1px solid rgba(0, 137, 207, 0.2); border-radius: 10px; font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
+                <strong style="color: var(--text-main); display: block; margin-bottom: 2px;">Meteo-Overlays:</strong>
+                Wind, Temperatur, Föhn (Δp) und Webcams werden oben in der Menüleiste ausgewählt.
+              </div>
               </div>
             </div>
           </div>

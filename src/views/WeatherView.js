@@ -13,6 +13,7 @@ export class WeatherView {
     this.measurementsData = null;
     this.webcamsData = null;
     this.textForecastData = null;
+    this.activeForecastRegion = '0'; // '0': Deutschschweiz, '1': Alpensüdseite & Engadin, '2': Westschweiz & Wallis
     this.selectedPairId = 'KLO_LUG'; // 'KLO_LUG' | 'GVE_GUT' | 'PIL_MTR' | 'DEM_GRE'
     this.activeTab = 'stations'; // 'stations' | 'webcams'
     this.selectedProvider = 'ALL'; // 'ALL' | 'meteo_swiss' | 'slf'
@@ -112,7 +113,7 @@ export class WeatherView {
             <div>
               <span class="badge-tag">MeteoSchweiz & SHV</span>
               <h2 class="section-heading">Textprognosen</h2>
-              <p class="section-sub">Offizielles 3-Tage-Flugwetter für die Schweizer Alpen</p>
+              <p class="section-sub">Offizielles Alpen-Flugwetter nach Regionen</p>
             </div>
             <div>
               <button id="btn-goto-forecast" class="btn-primary" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
@@ -120,6 +121,13 @@ export class WeatherView {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             </div>
+          </div>
+
+          <!-- Region Switcher in Weather View -->
+          <div class="region-pills-row" style="margin-top: 14px; margin-bottom: 14px;">
+            <button data-forecast-region="0" class="region-pill ${this.activeForecastRegion === '0' ? 'active' : ''}">Deutschschweiz</button>
+            <button data-forecast-region="1" class="region-pill ${this.activeForecastRegion === '1' ? 'active' : ''}">Alpensüdseite & Engadin</button>
+            <button data-forecast-region="2" class="region-pill ${this.activeForecastRegion === '2' ? 'active' : ''}">Westschweiz & Wallis</button>
           </div>
 
           <div class="forecast-preview-box">
@@ -313,7 +321,9 @@ export class WeatherView {
       `;
     }
 
-    const rawHtml = this.textForecastData.text['0'] || '';
+    const rawHtml = (this.textForecastData.text && this.textForecastData.text[this.activeForecastRegion])
+      || this.textForecastData.text['0']
+      || '';
     const bodyMatch = rawHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     const content = bodyMatch ? bodyMatch[1] : rawHtml;
 
@@ -324,7 +334,7 @@ export class WeatherView {
         </div>
         <div class="snippet-action-bar">
           <button class="btn-secondary" id="btn-snippet-jump" style="font-size: 0.85rem; font-weight: 600;">
-            Heute, Morgen & Übermorgen sowie Isobarenkarte anzeigen →
+            Ausführliche Prognose aller Regionen & Isobarenkarte anzeigen →
           </button>
         </div>
       </div>
@@ -561,6 +571,14 @@ export class WeatherView {
     forecastBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         store.setTab('forecast');
+      });
+    });
+
+    // Region Switcher in WeatherView
+    this.container.querySelectorAll('[data-forecast-region]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.activeForecastRegion = btn.getAttribute('data-forecast-region');
+        this.render();
       });
     });
 
