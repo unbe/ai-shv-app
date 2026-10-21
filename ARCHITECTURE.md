@@ -286,11 +286,14 @@ Reversed from `fl5.java` and `ch.ubique.fluidsdk.reports.common.models.b`:
   - Provides vertical winds aloft profiles (1000m to 5000m).
   - Features an interactive surface temperature slider to simulate daytime heating and live recomputation of cloud base and thermals.
 
-### Map Controls Architecture & Separation of Concerns
-To prevent duplicate controls across the UI:
-1. **Top Bar (Meteo Overlays)**: Exclusively controls the active `LiveMapMeteoType` mode (`🍃 Wind`, `🌡️ Temp`, `⚡ Föhn / Δp`, `📷 Webcams`, `✕ Aus`).
-2. **Right Drawer (Aviation Layers & Base Map)**: Controls static aviation zones (Startplätze, Landeplätze, Lufträume CTR/TMA, Wildruhezonen) and Swisstopo basemaps (Pixelkarte, Luftbild, Grau, OSM). Redundant weather checkboxes were eliminated from the drawer.
-3. **Right FABs**: Fast-action triggers for Layers Drawer, Launch Site Wind Suitability (compass filter), and Switzerland Re-centering.
+### Unified Map Controls Architecture
+All map controls are consolidated into a **single, unified control drawer** (`#map-layers-drawer`):
+1. **Live-Wetter (Meteo-Overlays)**: Mode switcher for Wind & Böen, Temperatur, Föhn / Δp, Webcams, or Aus.
+2. **Fluggebiete & Lufträume**: Toggle switches for Startplätze (Take-offs), Landeplätze (Landings), Luftraum (CTR/TMA/Segelflug), and Wildruhezonen (300m AGL).
+3. **Startplatz-Windfilter (Compass Rose)**: Interactive 8-direction compass selector to filter launch sites according to flyable wind directions, with a one-click reset button.
+4. **Basiskarte (Swisstopo & Maps)**: Swisstopo Pixelkarte, Swisstopo Luftbild (Swissimage), Swisstopo Grau, and OpenStreetMap.
+
+The top floating bar is dedicated exclusively to the location/site search bar and active filter indicators, preventing any controls fragmentation or duplicate UI elements. Leaflet is absolutely positioned within the map container to guarantee 100% viewport coverage.
 
 ---
 

@@ -68,7 +68,7 @@ export class MapView {
 
     this.container.innerHTML = `
       <div class="map-view-wrapper">
-        <!-- 1. Top Search Bar & Meteo Mode Selector -->
+        <!-- 1. Top Search Bar & Active Filters -->
         <div class="map-top-container">
           <div class="map-search-wrapper">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
@@ -77,29 +77,6 @@ export class MapView {
             </svg>
             <input type="text" id="map-search-input" placeholder="${t.map.searchPlaceholder}" value="${searchQuery}" autocomplete="off" />
             ${searchQuery ? `<button id="btn-clear-search" class="clear-btn" title="Suche löschen">&times;</button>` : ''}
-          </div>
-
-          <!-- Official SHV Live Map Meteo Mode Selector (LiveMapMeteoType) -->
-          <div class="meteo-mode-bar">
-            <button data-meteo-mode="WIND" class="meteo-pill ${meteoMode === 'WIND' ? 'active' : ''}" title="Windwerte & Böen an Stationen">
-              <span class="pill-icon">🍃</span>
-              <span>Wind</span>
-            </button>
-            <button data-meteo-mode="TEMPERATURE" class="meteo-pill ${meteoMode === 'TEMPERATURE' ? 'active' : ''}" title="Temperatur-Overlay an Stationen">
-              <span class="pill-icon">🌡️</span>
-              <span>Temp</span>
-            </button>
-            <button data-meteo-mode="PRESSURE_DIFFERENCE" class="meteo-pill ${meteoMode === 'PRESSURE_DIFFERENCE' ? 'active' : ''}" title="Offizielle Transekte (Gotthard, Genf-Güttingen, Pilatus-Matro, Jura)">
-              <span class="pill-icon">⚡</span>
-              <span>Föhn / Δp</span>
-            </button>
-            <button data-meteo-mode="WEBCAM" class="meteo-pill ${meteoMode === 'WEBCAM' ? 'active' : ''}" title="Alpine Webcams mit Live-Vorschau">
-              <span class="pill-icon">📷</span>
-              <span>Webcams</span>
-            </button>
-            <button data-meteo-mode="NONE" class="meteo-pill ${meteoMode === 'NONE' ? 'active' : ''}" title="Meteo-Ebenen ausblenden">
-              <span>✕</span>
-            </button>
           </div>
 
           <!-- Active Filter Indicator Pills -->
@@ -121,20 +98,12 @@ export class MapView {
 
         <!-- 2. Right Floating Action Button (FAB) Stack -->
         <div class="map-fab-column">
-          <!-- Layers & Basemap FAB -->
-          <button id="btn-fab-layers" class="map-fab" title="Ebenen & Basiskarte">
+          <!-- Single Unified Map Controls FAB -->
+          <button id="btn-fab-layers" class="map-fab" title="Karten-Optionen, Ebenen & Wetter">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
               <polyline points="2 17 12 22 22 17"></polyline>
               <polyline points="2 12 12 17 22 12"></polyline>
-            </svg>
-          </button>
-
-          <!-- Wind Compass Filter FAB -->
-          <button id="btn-fab-wind" class="map-fab ${windFilter.length > 0 ? 'fab-active' : ''}" title="Windfilter">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
             </svg>
             ${windFilter.length > 0 ? `<span class="fab-badge">${windFilter.length}</span>` : ''}
           </button>
@@ -148,39 +117,42 @@ export class MapView {
           </button>
         </div>
 
-        <!-- 3. Layers & Basemaps Flyout Drawer -->
+        <!-- 3. Single Unified Map Controls Drawer (All Controls in One Single Box) -->
         <div id="map-layers-drawer" class="map-drawer hidden">
           <div class="drawer-header">
-            <h3>Ebenen & Basiskarte</h3>
+            <h3>Karten-Optionen & Ebenen</h3>
             <button class="drawer-close" id="btn-close-layers">&times;</button>
           </div>
           <div class="drawer-body">
-            <!-- Basemap Section -->
+            <!-- 3.1 Live-Wetter Overlays -->
             <div class="drawer-section">
-              <h4 class="drawer-subtitle">Basiskarte</h4>
-              <div class="basemap-grid">
-                <button data-base="topoColor" class="basemap-card ${baseMap === 'topoColor' ? 'active' : ''}">
-                  <img src="/assets/ic_topo_raster.png" alt="Topo" class="basemap-card-img" />
-                  <span>Pixelkarte</span>
+              <h4 class="drawer-subtitle">Live-Wetter (Meteo-Overlays)</h4>
+              <div class="drawer-meteo-pills-row">
+                <button data-meteo-mode="WIND" class="meteo-pill ${meteoMode === 'WIND' ? 'active' : ''}" title="Windwerte & Böen an Stationen">
+                  <span class="pill-icon">🍃</span>
+                  <span>Wind & Böen</span>
                 </button>
-                <button data-base="topoSatellite" class="basemap-card ${baseMap === 'topoSatellite' ? 'active' : ''}">
-                  <img src="/assets/ic_topo_imagery.png" alt="Luftbild" class="basemap-card-img" />
-                  <span>Luftbild</span>
+                <button data-meteo-mode="TEMPERATURE" class="meteo-pill ${meteoMode === 'TEMPERATURE' ? 'active' : ''}" title="Temperatur-Overlay an Stationen">
+                  <span class="pill-icon">🌡️</span>
+                  <span>Temperatur</span>
                 </button>
-                <button data-base="topoLight" class="basemap-card ${baseMap === 'topoLight' ? 'active' : ''}">
-                  <img src="/assets/ic_topo_light.png" alt="Grau" class="basemap-card-img" />
-                  <span>Grau</span>
+                <button data-meteo-mode="PRESSURE_DIFFERENCE" class="meteo-pill ${meteoMode === 'PRESSURE_DIFFERENCE' ? 'active' : ''}" title="Offizielle Transekte (Gotthard, Genf-Güttingen, Pilatus-Matro, Jura)">
+                  <span class="pill-icon">⚡</span>
+                  <span>Föhn / Δp</span>
                 </button>
-                <button data-base="topoOsm" class="basemap-card ${baseMap === 'topoOsm' ? 'active' : ''}">
-                  <div class="basemap-osm-placeholder">OSM</div>
-                  <span>OpenStreet</span>
+                <button data-meteo-mode="WEBCAM" class="meteo-pill ${meteoMode === 'WEBCAM' ? 'active' : ''}" title="Alpine Webcams mit Live-Vorschau">
+                  <span class="pill-icon">📷</span>
+                  <span>Webcams</span>
+                </button>
+                <button data-meteo-mode="NONE" class="meteo-pill pill-none ${meteoMode === 'NONE' ? 'active' : ''}" title="Meteo-Ebenen ausblenden">
+                  <span>✕ Keine Wetter-Ebene</span>
                 </button>
               </div>
             </div>
 
-            <!-- Overlays Section -->
+            <!-- 3.2 Fluggebiete & Lufträume -->
             <div class="drawer-section">
-              <h4 class="drawer-subtitle">Kartenebenen</h4>
+              <h4 class="drawer-subtitle">Fluggebiete & Lufträume</h4>
               <div class="layer-switch-list">
                 <label class="layer-switch-item">
                   <div class="layer-switch-label">
@@ -218,38 +190,50 @@ export class MapView {
                   <span class="switch-toggle"></span>
                 </label>
               </div>
+            </div>
 
-              <div class="drawer-meteo-hint" style="margin-top: 14px; padding: 10px 12px; background: rgba(0, 137, 207, 0.08); border: 1px solid rgba(0, 137, 207, 0.2); border-radius: 10px; font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
-                <strong style="color: var(--text-main); display: block; margin-bottom: 2px;">Meteo-Overlays:</strong>
-                Wind, Temperatur, Föhn (Δp) und Webcams werden oben in der Menüleiste ausgewählt.
+            <!-- 3.3 Startplatz Windfilter (Kompass) -->
+            <div class="drawer-section">
+              <h4 class="drawer-subtitle">Startplatz-Ausrichtung (Windfilter)</h4>
+              <p class="drawer-hint">Filtert Startplätze nach passender Windrichtung:</p>
+              <div class="compass-rose-grid">
+                ${windDirs.map(d => `
+                  <button data-wind="${d}" class="compass-btn ${windFilter.includes(d) ? 'active' : ''}">
+                    ${d}
+                  </button>
+                `).join('')}
               </div>
+              <div id="wind-drawer-reset-wrapper" style="display: ${windFilter.length > 0 ? 'block' : 'none'}; margin-top: 8px;">
+                <button id="btn-reset-wind-filter" class="btn-secondary" style="width: 100%; font-size: 0.8rem; padding: 6px;">Filter zurücksetzen (${windFilter.join(', ')})</button>
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- 4. Wind Compass Selector Drawer -->
-        <div id="map-wind-drawer" class="map-drawer hidden">
-          <div class="drawer-header">
-            <h3>Startplatz Windfilter</h3>
-            <button class="drawer-close" id="btn-close-wind">&times;</button>
-          </div>
-          <div class="drawer-body">
-            <p class="drawer-hint">Wähle Windrichtungen aus, um nur passende Startplätze zu sehen:</p>
-            <div class="compass-rose-grid">
-              ${windDirs.map(d => `
-                <button data-wind="${d}" class="compass-btn ${windFilter.includes(d) ? 'active' : ''}">
-                  ${d}
+            <!-- 3.4 Basiskarte -->
+            <div class="drawer-section">
+              <h4 class="drawer-subtitle">Basiskarte</h4>
+              <div class="basemap-grid">
+                <button data-base="topoColor" class="basemap-card ${baseMap === 'topoColor' ? 'active' : ''}">
+                  <img src="/assets/ic_topo_raster.png" alt="Topo" class="basemap-card-img" />
+                  <span>Pixelkarte</span>
                 </button>
-              `).join('')}
-            </div>
-            <div id="wind-drawer-reset-wrapper" style="display: ${windFilter.length > 0 ? 'block' : 'none'};" class="text-center mt-3">
-              <button id="btn-reset-wind-filter" class="btn-secondary" style="width: 100%;">Filter zurücksetzen</button>
+                <button data-base="topoSatellite" class="basemap-card ${baseMap === 'topoSatellite' ? 'active' : ''}">
+                  <img src="/assets/ic_topo_imagery.png" alt="Luftbild" class="basemap-card-img" />
+                  <span>Luftbild</span>
+                </button>
+                <button data-base="topoLight" class="basemap-card ${baseMap === 'topoLight' ? 'active' : ''}">
+                  <img src="/assets/ic_topo_light.png" alt="Grau" class="basemap-card-img" />
+                  <span>Grau</span>
+                </button>
+                <button data-base="topoOsm" class="basemap-card ${baseMap === 'topoOsm' ? 'active' : ''}">
+                  <div class="basemap-osm-placeholder">OSM</div>
+                  <span>OpenStreet</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Leaflet Map Container -->
+        <!-- 4. Leaflet Map Container -->
         <div id="shv-leaflet-map" class="leaflet-map-element"></div>
       </div>
     `;
@@ -288,24 +272,13 @@ export class MapView {
 
     // Floating Action Buttons (FABs)
     const btnFabLayers = this.container.querySelector('#btn-fab-layers');
-    const btnFabWind = this.container.querySelector('#btn-fab-wind');
     const btnFabCenter = this.container.querySelector('#btn-fab-center');
     const layersDrawer = this.container.querySelector('#map-layers-drawer');
-    const windDrawer = this.container.querySelector('#map-wind-drawer');
 
     if (btnFabLayers && layersDrawer) {
       btnFabLayers.addEventListener('click', (e) => {
         e.stopPropagation();
         layersDrawer.classList.toggle('hidden');
-        if (windDrawer) windDrawer.classList.add('hidden');
-      });
-    }
-
-    if (btnFabWind && windDrawer) {
-      btnFabWind.addEventListener('click', (e) => {
-        e.stopPropagation();
-        windDrawer.classList.toggle('hidden');
-        if (layersDrawer) layersDrawer.classList.add('hidden');
       });
     }
 
@@ -314,14 +287,8 @@ export class MapView {
       closeLayers.addEventListener('click', () => layersDrawer.classList.add('hidden'));
     }
 
-    const closeWind = this.container.querySelector('#btn-close-wind');
-    if (closeWind && windDrawer) {
-      closeWind.addEventListener('click', () => windDrawer.classList.add('hidden'));
-    }
-
-    // Prevent map click when interacting inside drawers
+    // Prevent map click when interacting inside drawer
     if (layersDrawer) layersDrawer.addEventListener('click', (e) => e.stopPropagation());
-    if (windDrawer) windDrawer.addEventListener('click', (e) => e.stopPropagation());
 
     if (btnFabCenter) {
       btnFabCenter.addEventListener('click', () => {
@@ -424,12 +391,10 @@ export class MapView {
     if (layers.webcams) this.webcamsLayer.addTo(this.map);
     if (layers.foehnAxis) this.foehnLayer.addTo(this.map);
 
-    // Click outside deselects and closes flyout drawers
+    // Click outside deselects and closes flyout drawer
     this.map.on('click', (e) => {
       const layersDrawer = this.container.querySelector('#map-layers-drawer');
-      const windDrawer = this.container.querySelector('#map-wind-drawer');
       if (layersDrawer) layersDrawer.classList.add('hidden');
-      if (windDrawer) windDrawer.classList.add('hidden');
 
       // If clicked on empty space, deselect
       if (!e.originalEvent._shvHandled) {
@@ -439,12 +404,17 @@ export class MapView {
       }
     });
 
-    // Ensure map tiles recalculate on next frame
+    // Ensure map tiles recalculate properly
     requestAnimationFrame(() => {
       if (this.map) {
         this.map.invalidateSize();
       }
     });
+    setTimeout(() => {
+      if (this.map) {
+        this.map.invalidateSize();
+      }
+    }, 200);
   }
 
   resetView() {

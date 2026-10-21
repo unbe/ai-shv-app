@@ -365,9 +365,15 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
 }
 
 .leaflet-map-element {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
   height: 100%;
   z-index: 1;
@@ -668,6 +674,45 @@ body {
   letter-spacing: 0.6px;
   color: var(--text-muted);
   margin: 0;
+}
+
+.drawer-meteo-pills-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.drawer-meteo-pills-row .meteo-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.drawer-meteo-pills-row .meteo-pill:hover {
+  color: var(--text-main);
+  border-color: var(--text-muted);
+}
+
+.drawer-meteo-pills-row .meteo-pill.active {
+  background: var(--shv-blue);
+  color: #FFFFFF;
+  border-color: var(--shv-blue);
+  box-shadow: 0 2px 8px rgba(0, 137, 207, 0.4);
+}
+
+.drawer-meteo-pills-row .meteo-pill.pill-none {
+  grid-column: span 2;
 }
 
 .drawer-hint {
