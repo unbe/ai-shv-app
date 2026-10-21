@@ -215,21 +215,96 @@ def get_default_payerne_sounding():
         {"alt": 5000, "p": 540.0, "t": -17.0, "td": -28.0, "wind_speed": 55, "wind_dir": 285}
     ]
 
+def generate_location_sounding(name="Payerne", elev_m=490.0, lat=46.82, lon=6.94, surface_temp_c=None, surface_dew_c=None):
+    """Generate high-resolution thermodynamic sounding profile adapted to station elevation and geography"""
+    elev = max(100.0, float(elev_m))
+    s_p = round(altitude_to_pressure(elev), 1)
+
+    if surface_temp_c is not None:
+        t0 = float(surface_temp_c)
+    else:
+        # Standard alpine lapse rate from reference 17.5°C at 450m
+        t0 = round(17.5 - 0.0065 * (elev - 450.0), 1)
+
+    if surface_dew_c is not None:
+        td0 = float(surface_dew_c)
+    else:
+        td0 = round(t0 - 7.5, 1)
+
+    alt_steps = [elev]
+    curr = math.ceil((elev + 100.0) / 250.0) * 250.0
+    while curr <= 5000.0:
+        alt_steps.append(curr)
+        curr += 250.0 if curr < 2500.0 else 500.0
+    if alt_steps[-1] < 5000.0:
+        alt_steps.append(5000.0)
+
+    levels = []
+    # Ground level
+    levels.append({
+        "alt": round(elev),
+        "p": s_p,
+        "t": t0,
+        "td": td0,
+        "wind_speed": 10,
+        "wind_dir": 230
+    })
+
+    # Upper levels
+    for a in alt_steps[1:]:
+        p = round(altitude_to_pressure(a), 1)
+        dz = a - elev
+        # Alpine capping inversion around 2200-2400m
+        inversion_bump = 1.0 if 2150.0 <= a <= 2350.0 else 0.0
+
+        t = round(t0 - (0.0065 * dz) + inversion_bump, 1)
+        td = round(td0 - (0.0085 * dz) - (2.0 if a > 2000.0 else 0.0), 1)
+
+        ws = round(10.0 + (a / 5000.0) * 35.0)
+        wd = round((235.0 + (a / 5000.0) * 45.0) % 360)
+
+        levels.append({
+            "alt": round(a),
+            "p": p,
+            "t": t,
+            "td": td,
+            "wind_speed": ws,
+            "wind_dir": wd
+        })
+
+    analysis = analyze_sounding(levels, t0, td0)
+    analysis["station"] = {
+        "name": name,
+        "elevation": elev,
+        "lat": lat,
+        "lon": lon
+    }
+    analysis["sounding_levels"] = levels
+    return analysis
+
 if __name__ == "__main__":
-    # If run via CLI or piped JSON
     if len(sys.argv) > 1 and sys.argv[1] == "--test":
-        result = analyze_sounding(get_default_payerne_sounding())
+        result = generate_location_sounding("Payerne", 490.0, 46.82, 6.94)
         print(json.dumps(result, indent=2))
     elif not sys.stdin.isatty():
         try:
             payload = json.load(sys.stdin)
-            levels = payload.get("sounding_levels", get_default_payerne_sounding())
-            s_t = payload.get("surface_temp_c")
-            s_td = payload.get("surface_dew_c")
-            result = analyze_sounding(levels, s_t, s_td)
+            if "name" in payload or "elevation" in payload:
+                name = payload.get("name", "Station")
+                elev = payload.get("elevation", 500.0)
+                lat = payload.get("lat", 46.8)
+                lon = payload.get("lon", 8.2)
+                s_t = payload.get("surface_temp_c")
+                s_td = payload.get("surface_dew_c")
+                result = generate_location_sounding(name, elev, lat, lon, s_t, s_td)
+            else:
+                levels = payload.get("sounding_levels", get_default_payerne_sounding())
+                s_t = payload.get("surface_temp_c")
+                s_td = payload.get("surface_dew_c")
+                result = analyze_sounding(levels, s_t, s_td)
             print(json.dumps(result))
         except Exception as e:
             print(json.dumps({"error": str(e)}))
     else:
-        result = analyze_sounding(get_default_payerne_sounding())
+        result = generate_location_sounding("Payerne", 490.0, 46.82, 6.94)
         print(json.dumps(result))

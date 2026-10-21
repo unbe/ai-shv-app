@@ -23,6 +23,7 @@ const cache = {
   textForecast: {},
   isobarenSvg: {},
   timeseries: {},
+  outlooks: { data: null, timestamp: 0, ttl: 15 * 60 * 1000 },
 };
 
 // Real historical measurements buffer for Gotthard pressure difference
@@ -497,10 +498,61 @@ app.post('/api/emagram/calculate', (req, res) => {
   py.stdin.end();
 });
 
-// Default Emagram sounding endpoint
-app.get('/api/emagram/sounding', (req, res) => {
+// 8. Official Ubique Fluid Meteo Days Overview / Outlooks ("Aussichten")
+app.get('/api/meteo/outlooks', async (req, res) => {
+  const now = Date.now();
+  if (cache.outlooks.data && (now - cache.outlooks.timestamp < cache.outlooks.ttl)) {
+    return res.json(cache.outlooks.data);
+  }
+
+  try {
+    const url = 'https://static-prod.ubmeteo.io/v1/animation/switzerland/days_overview.json';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (resp.ok) {
+      const data = await resp.json();
+      cache.outlooks = { data, timestamp: now, ttl: 15 * 60 * 1000 };
+      return res.json(data);
+    }
+    throw new Error(`Upstream days_overview returned ${resp.status}`);
+  } catch (err) {
+    console.error('[Server] Days overview error:', err.message);
+    if (cache.outlooks.data) {
+      return res.json(cache.outlooks.data);
+    }
+    return res.status(503).json({ error: 'Aussichten vorübergehend nicht erreichbar' });
+  }
+});
+
+// 9. Official Previtemps / Emagram Sounding Stations
+app.get('/api/meteo/previtemps/stations', (req, res) => {
+  try {
+    const stationsPath = path.join(projectRoot, 'src', 'data', 'previtemps_stations.json');
+    if (fs.existsSync(stationsPath)) {
+      const raw = fs.readFileSync(stationsPath, 'utf8');
+      return res.json(JSON.parse(raw));
+    }
+    return res.status(404).json({ error: 'Stations file not found' });
+  } catch (err) {
+    console.error('[Server] Previtemps stations error:', err.message);
+    return res.status(500).json({ error: 'Failed to load previtemps stations' });
+  }
+});
+
+// 10. Previtemps / Sounding Aerological Calculation for Specific Location
+app.get('/api/meteo/previtemps/sounding', (req, res) => {
+  const name = req.query.name || 'Payerne';
+  const elevation = parseFloat(req.query.elevation || '490');
+  const lat = parseFloat(req.query.lat || '46.82');
+  const lon = parseFloat(req.query.lon || '6.94');
+  const sTemp = req.query.surface_temp ? parseFloat(req.query.surface_temp) : undefined;
+  const sDew = req.query.surface_dew ? parseFloat(req.query.surface_dew) : undefined;
+
   const pythonScript = path.join(__dirname, 'emagram_calc.py');
-  const py = spawn('python3', [pythonScript, '--test']);
+  const py = spawn('python3', [pythonScript]);
 
   let stdout = '';
   let stderr = '';
@@ -510,15 +562,79 @@ app.get('/api/emagram/sounding', (req, res) => {
 
   py.on('close', (code) => {
     if (code !== 0) {
-      return res.status(500).json({ error: stderr });
+      console.error('[Server] Previtemps python calculation error:', stderr);
+      return res.status(500).json({ error: stderr || 'Calculation failed' });
     }
     try {
       const result = JSON.parse(stdout);
       res.json(result);
     } catch (e) {
-      res.status(500).json({ error: 'Parse error' });
+      res.status(500).json({ error: 'Failed to parse python output', raw: stdout });
     }
   });
+
+  const payload = {
+    name,
+    elevation,
+    lat,
+    lon,
+    surface_temp_c: sTemp,
+    surface_dew_c: sDew,
+  };
+  py.stdin.write(JSON.stringify(payload));
+  py.stdin.end();
+});
+
+// Sounding by station name URL parameter
+app.get('/api/meteo/previtemps/sounding/:stationName', (req, res) => {
+  const stationName = decodeURIComponent(req.params.stationName);
+  try {
+    const stationsPath = path.join(projectRoot, 'src', 'data', 'previtemps_stations.json');
+    let station = null;
+    if (fs.existsSync(stationsPath)) {
+      const list = JSON.parse(fs.readFileSync(stationsPath, 'utf8'));
+      station = list.find(s => s.name.toLowerCase() === stationName.toLowerCase());
+    }
+    const elev = station ? station.elevation : 500;
+    const lat = station ? station.lat : 46.8;
+    const lon = station ? station.lon : 8.2;
+    const sTemp = req.query.surface_temp ? parseFloat(req.query.surface_temp) : undefined;
+    const sDew = req.query.surface_dew ? parseFloat(req.query.surface_dew) : undefined;
+
+    const pythonScript = path.join(__dirname, 'emagram_calc.py');
+    const py = spawn('python3', [pythonScript]);
+
+    let stdout = '';
+    let stderr = '';
+
+    py.stdout.on('data', (d) => { stdout += d.toString(); });
+    py.stderr.on('data', (d) => { stderr += d.toString(); });
+
+    py.on('close', (code) => {
+      if (code !== 0) {
+        return res.status(500).json({ error: stderr });
+      }
+      try {
+        const result = JSON.parse(stdout);
+        res.json(result);
+      } catch (e) {
+        res.status(500).json({ error: 'Parse error' });
+      }
+    });
+
+    const payload = {
+      name: station ? station.name : stationName,
+      elevation: elev,
+      lat,
+      lon,
+      surface_temp_c: sTemp,
+      surface_dew_c: sDew,
+    };
+    py.stdin.write(JSON.stringify(payload));
+    py.stdin.end();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // 5. Skybriefing DABS (Daily Airspace Bulletin Switzerland) Info

@@ -3179,3 +3179,576 @@ body {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+/* =========================================================================
+   6. Upgraded Forecast View: Outlooks, Text Categories & Emagram previtemps
+   ========================================================================= */
+
+.text-category-switcher-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+}
+
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.category-pill:hover {
+  color: var(--text-main);
+  border-color: var(--text-muted);
+}
+
+.category-pill.active {
+  background: var(--shv-blue);
+  color: #FFFFFF;
+  border-color: var(--shv-blue);
+  box-shadow: 0 2px 8px rgba(0, 137, 207, 0.35);
+}
+
+/* Outlooks Player */
+.outlook-player-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 18px;
+  margin-top: 16px;
+}
+
+.outlook-time-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+}
+
+.outlook-time-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.98rem;
+  color: var(--text-main);
+}
+
+.outlook-step-indicator {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--shv-blue);
+  background: rgba(0, 137, 207, 0.1);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.outlook-image-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 280px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #0f172a;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.outlook-map-img {
+  width: 100%;
+  max-width: 900px;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.outlook-empty-box {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 40px 20px;
+}
+
+.outlook-controls-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.player-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.player-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--shv-blue);
+}
+
+.player-btn.primary {
+  background: var(--shv-blue);
+  color: #FFFFFF;
+  border-color: var(--shv-blue);
+}
+
+.player-btn.primary.playing {
+  background: #EF4444;
+  border-color: #EF4444;
+}
+
+.outlook-timeline-slider {
+  flex: 1;
+  height: 6px;
+  accent-color: var(--shv-blue);
+  cursor: pointer;
+}
+
+.outlook-legend-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+.legend-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.legend-color-bar {
+  height: 10px;
+  border-radius: 6px;
+  width: 100%;
+}
+
+.legend-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Emagram Previtemps Section */
+.emagram-map-container-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.emagram-search-bar-row {
+  display: flex;
+  gap: 10px;
+}
+
+.emagram-search-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 8px 14px;
+  flex: 1;
+}
+
+.emagram-search-field input {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-size: 0.88rem;
+  width: 100%;
+  outline: none;
+}
+
+.popular-stations-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.popular-lbl {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.popular-station-pill {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 4px 12px;
+  border-radius: 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.popular-station-pill:hover {
+  border-color: var(--shv-blue);
+  color: var(--text-main);
+}
+
+.popular-station-pill.active {
+  background: rgba(0, 137, 207, 0.15);
+  border-color: var(--shv-blue);
+  color: var(--shv-blue);
+  font-weight: 700;
+}
+
+.emagram-leaflet-map {
+  width: 100%;
+  height: 380px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  z-index: 10;
+}
+
+.map-hint-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Custom Marker Pin for Emagram Sounding Stations */
+.custom-emagram-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.emagram-map-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--shv-blue);
+  padding: 3px 8px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.emagram-map-pin:hover {
+  transform: translate(-50%, -50%) scale(1.12);
+  z-index: 999;
+}
+
+.emagram-map-pin.selected {
+  background: var(--shv-blue);
+  color: #FFFFFF;
+  border-color: #FFFFFF;
+  box-shadow: 0 0 12px rgba(0, 137, 207, 0.8);
+  transform: translate(-50%, -50%) scale(1.18);
+  z-index: 1000;
+}
+
+/* Sounding Detail Card */
+.emagram-detail-box {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+}
+
+.sounding-station-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.station-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.station-name {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.station-elev-badge {
+  background: var(--shv-blue);
+  color: #FFFFFF;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.station-coord-badge {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+
+.station-sub-text {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Surface Simulator Slider */
+.surface-slider-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 12px 16px;
+  min-width: 280px;
+}
+
+.surface-slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.slider-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.slider-val {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #F59E0B;
+}
+
+.temp-slider-input {
+  width: 100%;
+  accent-color: #F59E0B;
+  cursor: pointer;
+}
+
+.slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Sounding KPIs */
+.sounding-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.sounding-kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.sounding-kpi-card .kpi-icon {
+  font-size: 1.8rem;
+}
+
+.sounding-kpi-card .kpi-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.sounding-kpi-card .kpi-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.sounding-kpi-card .kpi-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 2px 0;
+}
+
+.sounding-kpi-card .kpi-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.highlight-cyan { color: #22D3EE; }
+.highlight-orange { color: #F59E0B; }
+.highlight-green { color: #10B981; }
+.highlight-purple { color: #A855F7; }
+
+/* SVG Diagram Container */
+.emagram-diagram-wrapper {
+  background: #0B132B;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.diagram-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.diagram-title {
+  color: #F8FAFC;
+  font-size: 0.95rem;
+}
+
+.diagram-legend-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #94A3B8;
+  font-weight: 600;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.dot-red { background: #EF4444; }
+.dot-blue { background: #3B82F6; }
+.dot-orange { background: #F59E0B; }
+.dot-cyan { background: #22D3EE; }
+
+.svg-chart-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.emagram-svg {
+  width: 100%;
+  height: auto;
+  min-height: 250px;
+  display: block;
+}
+
+/* Winds Aloft */
+.winds-aloft-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.winds-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0 0 12px 0;
+}
+
+.winds-aloft-pills {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.wind-level-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-width: 72px;
+}
+
+.wind-alt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.wind-val {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.wind-dir {
+  display: inline-block;
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--shv-blue);
+  line-height: 1;
+}
+
+.wind-deg {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+

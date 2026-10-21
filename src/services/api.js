@@ -133,6 +133,50 @@ export class ShvApi {
     return null;
   }
 
+  static async getOutlooks() {
+    try {
+      const resp = await fetch('/api/meteo/outlooks');
+      if (resp.ok) return await resp.json();
+      console.error('[ShvApi.getOutlooks] HTTP error:', resp.status, resp.statusText);
+    } catch (e) {
+      console.error('[ShvApi.getOutlooks] Network error:', e);
+    }
+    return null;
+  }
+
+  static async getPrevitempsStations() {
+    try {
+      const resp = await fetch('/api/meteo/previtemps/stations');
+      if (resp.ok) return await resp.json();
+      console.error('[ShvApi.getPrevitempsStations] HTTP error:', resp.status, resp.statusText);
+    } catch (e) {
+      console.error('[ShvApi.getPrevitempsStations] Network error:', e);
+    }
+    return [];
+  }
+
+  static async getPrevitempsSounding(stationName, surfaceTemp, surfaceDew) {
+    try {
+      let url = `/api/meteo/previtemps/sounding/${encodeURIComponent(stationName)}`;
+      const queryParams = [];
+      if (surfaceTemp !== undefined && surfaceTemp !== null) {
+        queryParams.push(`surface_temp=${surfaceTemp}`);
+      }
+      if (surfaceDew !== undefined && surfaceDew !== null) {
+        queryParams.push(`surface_dew=${surfaceDew}`);
+      }
+      if (queryParams.length > 0) {
+        url += `?${queryParams.join('&')}`;
+      }
+      const resp = await fetch(url);
+      if (resp.ok) return await resp.json();
+      console.error('[ShvApi.getPrevitempsSounding] HTTP error:', resp.status, resp.statusText);
+    } catch (e) {
+      console.error('[ShvApi.getPrevitempsSounding] Network error:', e);
+    }
+    return null;
+  }
+
   static async getEmagramSounding() {
     try {
       const resp = await fetch('/api/emagram/sounding');

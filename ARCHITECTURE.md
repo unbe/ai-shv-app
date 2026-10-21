@@ -254,16 +254,37 @@ The SHV WMS API (`v1/wms/person`) and Kotlin models use specialized naming conve
 - **Nested Objects**: Membership categories (`mitgliedkategorie.name`), insurance descriptions (`insurance.beschreibung`, `insurance.name`), and brevet categories are resolved dynamically using `resolveLocalizedString(val, lang)` to eliminate `[object Object]` stringification bugs across all views.
 - **Card Levels**: Brevets (`ShvBrevet` `b`) store ratings in `cardLevels` (`ShvCardLevel` `c`: `level`, `date`, `remarks`).
 
-### Text Forecasts & Synoptic Weather Charts
-The application integrates official MeteoSchweiz and SHV daily text prognoses directly from Verband infrastructure:
-- **Text Forecasts**: `https://shv-app-ws-prod.shv-app.ch/v1/text/forecast/{lang}.json` (regional outlook for Switzerland in DE, FR, IT).
-  - The JSON `text` map contains 3 **Regional Text Forecasts** (each including complete multi-day outlooks: Heute, Morgen, Übermorgen & Trend):
-    - Key `'0'`: **Deutschschweiz, Nord- und Mittelbünden** (Suisse alémanique / Svizzera tedesca)
-    - Key `'1'`: **Alpensüdseite und das Engadin** (Sud des Alpes / Sud delle Alpi)
-    - Key `'2'`: **Westschweiz und das Wallis** (Suisse romande / Svizzera romanda)
+### Text Forecasts, Soaring Prognoses & Synoptic Weather Charts
+The application integrates official MeteoSchweiz and SHV daily text prognoses directly from Verband infrastructure (`v1/text/forecast/{lang}.json`):
+- **Regional Forecast (`forecast`)**: 3 regional text forecasts with multi-day outlooks (Heute, Morgen, Übermorgen & Trend):
+  - Key `'0'`: **Deutschschweiz, Nord- und Mittelbünden** (Suisse alémanique / Svizzera tedesca)
+  - Key `'1'`: **Alpensüdseite und das Engadin** (Sud des Alpes / Sud delle Alpi)
+  - Key `'2'`: **Westschweiz und das Wallis** (Suisse romande / Svizzera romanda)
+- **Gleitschirmprognose (`gleitschirmForecast`)**: Official Paragliding text prognosis covering thermal activity, convection, wind shear, cloud base, and alpine safety warnings.
+- **Segelflugprognose (`segelflugForecast`)**: Official MeteoSchweiz Soaring briefing detailing inversion levels, thermal strengths, high-altitude winds, and convection triggers.
+- **Allgemeine Lage (`generalForecast`)**: Synoptic overview across Central Europe.
 - **Isobar Charts**: `https://shv-app-ws-prod.shv-app.ch/v1/text/isobaren/{lang}.svg` (Synoptic European surface pressure field and fronts).
 - **Timeseries Telemetry**: `https://weather-ws-prod.ubmeteo.io/v1/measurements/timeseries/{stationId}?parameters=...` (24-hour recorded historical telemetry).
-- **Dashboard & Dedicated Navigation**: Textprognosen are featured directly on the Weather dashboard (`WeatherView.js`) with an expandable regional synopsis card and region tabs, as well as a dedicated full-screen tab (`ForecastView.js` / `Textprognosen`) matching the native app (`home_screen_product_text`).
+
+### Meteo-Aussichten (Outlooks / Days Overview)
+Reversed from `ShvAggregatedForecastType` and `https://static-prod.ubmeteo.io/v1/animation/switzerland/days_overview.json`:
+- **`RELATIVE_SUNSHINE`**: 6-hour interval raster forecast animations (`.webp`) displaying relative sunshine duration across Switzerland (0% - 100%).
+- **`PRECIPITATION_PROBABILITY_WEAK`**: 12-hour interval raster animations mapping light precipitation probability (>0.1 mm / 12h).
+- **`PRECIPITATION_PROBABILITY_STRONG`**: 12-hour interval raster animations mapping heavy precipitation probability (>1.0 mm / 12h).
+- Interactive timeline stepper, time range labels, and play/pause animation cycle.
+
+### Previtemps Sounding Stations & Thermodynamic Emagram Engine
+Reversed from `fl5.java` and `ch.ubique.fluidsdk.reports.common.models.b`:
+- **107 Sounding Locations**: Extracted with exact geographic coordinates and elevations covering the entire Swiss Alpine space (Payerne, Engelberg, Interlaken, Fiesch, Davos, Scuol, Zermatt, Chur, Zürich, Sion, etc.).
+- **Interactive Map**: Leaflet sounding map allowing pilots to select any station or search by name.
+- **Thermodynamic Calculation Engine (`server/emagram_calc.py`)**:
+  - Calculates Lifting Condensation Level (LCL / Wolkenbasis) using Bolton 1980 equations.
+  - Detects atmospheric inversions and capping barriers.
+  - Calculates Convective Trigger Temperature (Auslösetemperatur).
+  - Computes dry & moist adiabatic parcel ascent curve (DALR / MALR).
+  - Determines thermal ceiling (Thermik-Obergrenze), usable depth, and average climb rates ($w_{\text{avg}}$ in m/s).
+  - Provides vertical winds aloft profiles (1000m to 5000m).
+  - Features an interactive surface temperature slider to simulate daytime heating and live recomputation of cloud base and thermals.
 
 ### Map Controls Architecture & Separation of Concerns
 To prevent duplicate controls across the UI:
