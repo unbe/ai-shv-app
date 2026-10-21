@@ -243,11 +243,23 @@ The official application organizes real-time meteo into 5 distinct modes (`LiveM
 - `WEBCAM`: Displays alpine live webcams from `webcam-prod.ubmeteo.io/v1/webcams/overview` with high-resolution imagery and timelapses.
 - `NONE`: Meteo overlay deactivated.
 
+### Member Data Model & LocalizedString Serialization
+The SHV WMS API (`v1/wms/person`) and Kotlin models use specialized naming conventions and localized object structures:
+- **Pilot Names**: `vorname` holds the pilot's first name, while `name` holds the pilot's last name. The web layer (`ProfileView.js`) combines both (`vorname + ' ' + name`) to prevent missing first names.
+- **`LocalizedString` Model (`q64`)**: Multilingual strings are delivered as serialized objects:
+  ```json
+  { "de": "Aktivmitglied", "fr": "Membre actif", "it": "Membro attivo", "en": "Active member" }
+  ```
+  Ktor/kotlinx serialized properties map to `{ a: de, b: fr, c: it, d: en }`.
+- **Nested Objects**: Membership categories (`mitgliedkategorie.name`), insurance descriptions (`insurance.beschreibung`, `insurance.name`), and brevet categories are resolved dynamically using `resolveLocalizedString(val, lang)` to eliminate `[object Object]` stringification bugs across all views.
+- **Card Levels**: Brevets (`ShvBrevet` `b`) store ratings in `cardLevels` (`ShvCardLevel` `c`: `level`, `date`, `remarks`).
+
 ### Text Forecasts & Synoptic Weather Charts
 The application integrates official MeteoSchweiz and SHV daily text prognoses directly from Verband infrastructure:
 - **Text Forecasts**: `https://shv-app-ws-prod.shv-app.ch/v1/text/forecast/{lang}.json` (3-day regional outlook for Deutschschweiz, Romandie, and Ticino in DE, FR, IT).
 - **Isobar Charts**: `https://shv-app-ws-prod.shv-app.ch/v1/text/isobaren/{lang}.svg` (Synoptic European surface pressure field and fronts).
 - **Timeseries Telemetry**: `https://weather-ws-prod.ubmeteo.io/v1/measurements/timeseries/{stationId}?parameters=...` (24-hour recorded historical telemetry).
+- **Dashboard & Dedicated Navigation**: Textprognosen are featured directly on the Weather dashboard (`WeatherView.js`) with an expandable synopsis card and day preview, as well as a dedicated full-screen tab (`ForecastView.js` / `Textprognosen`) matching the native app (`home_screen_product_text`).
 
 ---
 

@@ -4,7 +4,7 @@ export const fr = {
   tabs: {
     map: 'Carte Live',
     weather: 'Mesures & Foehn',
-    forecast: 'Météo vol',
+    forecast: 'Prévisions texte',
     safety: 'Sécurité & Outils',
     profile: 'Profil FSVL'
   },

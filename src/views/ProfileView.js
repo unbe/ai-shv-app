@@ -1,8 +1,56 @@
 import { store } from '../state.js';
 import { ShvApi } from '../services/api.js';
 
+/**
+ * Universal resolver for SHV LocalizedString objects and complex API models
+ * Prevents any "[object Object]" leaks into the UI.
+ */
+export function resolveLocalizedString(val, lang = 'de') {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val.trim();
+  if (typeof val === 'number') return String(val);
+
+  if (typeof val === 'object') {
+    // 1. Standard LocalizedString { de, fr, it, en }
+    if (val[lang] && typeof val[lang] === 'string') return val[lang].trim();
+    if (val.de && typeof val.de === 'string') return val.de.trim();
+    if (val.en && typeof val.en === 'string') return val.en.trim();
+    if (val.fr && typeof val.fr === 'string') return val.fr.trim();
+    if (val.it && typeof val.it === 'string') return val.it.trim();
+
+    // 2. Ktor/kotlinx serialized fields { a: de, b: fr, c: it, d: en }
+    if (val.a && typeof val.a === 'string') return val.a.trim();
+    if (val.d && typeof val.d === 'string') return val.d.trim();
+    if (val.b && typeof val.b === 'string') return val.b.trim();
+    if (val.c && typeof val.c === 'string') return val.c.trim();
+
+    // 3. Nested object with known text properties
+    for (const prop of ['name', 'beschreibung', 'label', 'title', 'text', 'value', 'code']) {
+      if (val[prop]) {
+        const resolved = resolveLocalizedString(val[prop], lang);
+        if (resolved) return resolved;
+      }
+    }
+
+    // 4. Array
+    if (Array.isArray(val)) {
+      return val.map(x => resolveLocalizedString(x, lang)).filter(Boolean).join(', ');
+    }
+
+    // 5. Ultimate fallback for arbitrary object: find first string value
+    for (const key of Object.keys(val)) {
+      if (typeof val[key] === 'string' && val[key].trim()) {
+        return val[key].trim();
+      }
+    }
+  }
+
+  return '';
+}
+
 export async function renderProfileView(container) {
   const t = store.t;
+  const lang = store.state.lang || 'de';
   const sid = store.state.sid;
   let p = store.state.profile;
 
@@ -14,7 +62,6 @@ export async function renderProfileView(container) {
         p = sessionData.profile;
         store.setSession(sid, p);
       } else if (!sessionData) {
-        // Session expired on server
         store.logout();
         return renderProfileView(container);
       }
@@ -24,7 +71,7 @@ export async function renderProfileView(container) {
   }
 
   // Ensure no dummy/rubbish profile is rendered
-  if (p && (p.firstName === 'Pilot' || (!p.firstName && !p.name))) {
+  if (p && (p.firstName === 'Pilot' || (!p.vorname && !p.name && !p.firstName && !p.lastName))) {
     store.logout();
     p = null;
   }
@@ -148,45 +195,54 @@ export async function renderProfileView(container) {
           feedbackBox.style.background = 'rgba(213, 43, 30, 0.12)';
           feedbackBox.style.border = '1px solid rgba(213, 43, 30, 0.3)';
           feedbackBox.style.color = '#ff6b6b';
-          feedbackBox.textContent = 'Bitte füge die vollständige Callback-URL der Seite «Anmeldung erfolgreich» ein.';
+          feedbackBox.textContent = 'Bitte füge zuerst die kopierte Callback-URL ein.';
           return;
         }
 
         try {
           btnSubmit.disabled = true;
-          btnSubmit.innerHTML = `<span>Token wird geprüft & Profildaten werden geladen...</span>`;
+          btnSubmit.innerHTML = `<span>Anmeldung wird autorisiert...</span>`;
           feedbackBox.className = '';
           feedbackBox.style.background = 'rgba(0, 137, 207, 0.12)';
           feedbackBox.style.border = '1px solid rgba(0, 137, 207, 0.3)';
           feedbackBox.style.color = 'var(--text-main)';
-          feedbackBox.textContent = 'Token-Austausch läuft mit SHV Keycloak...';
+          feedbackBox.textContent = 'Authentifizierungscode wird ausgetauscht...';
 
-          const exchangeResult = await ShvApi.authExchange(val);
-          store.setSession(exchangeResult.sid, exchangeResult.profile);
+          const res = await ShvApi.authExchange(val);
+          store.setSession(res.sid, res.profile);
           await renderProfileView(container);
         } catch (err) {
-          console.error('[ProfileView] Exchange error:', err);
+          console.error('[ProfileView] Exchange failed:', err);
           btnSubmit.disabled = false;
           btnSubmit.innerHTML = `<span>2. Anmeldung abschliessen</span>`;
           feedbackBox.className = '';
           feedbackBox.style.background = 'rgba(213, 43, 30, 0.12)';
           feedbackBox.style.border = '1px solid rgba(213, 43, 30, 0.3)';
           feedbackBox.style.color = '#ff6b6b';
-          feedbackBox.textContent = err.message || 'Token-Austausch fehlgeschlagen.';
+          feedbackBox.textContent = err.message || 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.';
         }
       });
     }
-
     return;
   }
 
   // 2. AUTHENTICATED LOGGED-IN PROFILE (Render genuine verified member data)
-  const fullName = p.firstName && p.lastName
-    ? `${p.firstName} ${p.lastName}`
-    : (p.name || p.companyName || 'SHV Mitglied');
-  const shvId = p.shvNumber || p.shvNummer || p.extId || '–';
-  const canton = p.address?.kanton || p.canton || '–';
-  const categoryName = p.memberships?.[0]?.mitgliedkategorie?.name || p.memberCategory || 'Aktivmitglied';
+  // Fix firstName/lastName extraction: in SHV WMS, vorname = firstName, name = lastName
+  const firstName = p.vorname || p.firstName || '';
+  const lastName = p.name || p.lastName || '';
+  const fullName = (firstName && lastName)
+    ? `${firstName} ${lastName}`
+    : (firstName || lastName || p.companyName || 'SHV Mitglied');
+
+  const shvId = p.shvNummer || p.shvNumber || p.extId || '–';
+  const canton = resolveLocalizedString(p.address?.kanton || p.canton || p.address?.ort) || '–';
+
+  // Resolve Category name cleanly
+  const rawCat = p.memberships?.[0]?.mitgliedkategorie?.name
+    || p.memberships?.[0]?.mitgliedkategorie
+    || p.memberCategory;
+  const categoryName = resolveLocalizedString(rawCat, lang) || 'Aktivmitglied';
+
   const membershipOrg = p.memberships?.[0]?.organisationName || '';
   const validUntil = p.memberships?.[0]?.austrittsdatum || 'Aktiv';
 
@@ -249,13 +305,34 @@ export async function renderProfileView(container) {
         </div>
       </div>
 
-      <!-- 2. PILOT RATINGS / BREVETS (Rendered only if present in genuine response) -->
+      <!-- 2. PILOT RATINGS / BREVETS (Parsed from ShvBrevet & ShvCardLevel) -->
       ${Array.isArray(p.brevets) && p.brevets.length > 0 ? `
         <section class="profile-section">
           <h3 class="section-heading-sm">Berechtigungen & Lizenzen</h3>
           <div class="ratings-card-box">
             ${p.brevets.map(b => {
-              const catName = b.category || b.name || 'Brevet';
+              const catRaw = b.category || b.name || 'Brevet';
+              const catName = resolveLocalizedString(catRaw, lang) || 'Paraglider';
+              const levels = Array.isArray(b.cardLevels) ? b.cardLevels : (b.level ? [{ level: b.level, date: b.date }] : []);
+
+              if (levels.length > 0) {
+                return levels.map(lvl => {
+                  const levelName = resolveLocalizedString(lvl.level || lvl.name, lang) || 'Brevet Pilot';
+                  const dateStr = lvl.date ? `Ausgestellt: ${lvl.date}` : 'Gültig · SHV Prüfungskommission';
+                  return `
+                    <div class="rating-badge-item">
+                      <div class="rating-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                      </div>
+                      <div class="rating-info">
+                        <span class="rating-title">${catName}: ${levelName}</span>
+                        <span class="rating-status">${dateStr}</span>
+                      </div>
+                    </div>
+                  `;
+                }).join('');
+              }
+
               return `
                 <div class="rating-badge-item">
                   <div class="rating-icon">
@@ -272,18 +349,18 @@ export async function renderProfileView(container) {
         </section>
       ` : ''}
 
-      <!-- 3. LIABILITY INSURANCE STATUS (Rendered only if present in genuine response) -->
+      <!-- 3. LIABILITY INSURANCE STATUS (Parsed from ShvInsurance LocalizedString) -->
       ${p.insurance ? `
         <section class="profile-section">
           <h3 class="section-heading-sm">${t.profile.insuranceTitle}</h3>
           <div class="insurance-card-box">
             <div class="ins-top">
-              <span class="ins-amount">${p.insurance.beschreibung || p.insurance.name || 'Gültig versichert'}</span>
+              <span class="ins-amount">${resolveLocalizedString(p.insurance.beschreibung, lang) || resolveLocalizedString(p.insurance.name, lang) || 'CHF 5\'000\'000 Haftpflicht'}</span>
               <span class="ins-status-badge">Aktiv versichert</span>
             </div>
             <p class="ins-notice">${t.profile.insuranceNotice}</p>
             <div class="ins-meta">
-              ${p.insurance.name ? `<span>Typ: ${p.insurance.name}</span>` : ''}
+              ${p.insurance.name ? `<span>Typ: ${resolveLocalizedString(p.insurance.name, lang)}</span>` : ''}
               ${p.insurance.endDatum ? `<span>Gültig bis: ${p.insurance.endDatum}</span>` : ''}
               ${membershipOrg ? `<span>Club: <strong>${membershipOrg}</strong></span>` : ''}
             </div>
@@ -296,17 +373,22 @@ export async function renderProfileView(container) {
         <section class="profile-section">
           <h3 class="section-heading-sm">Verbandszugehörigkeit & Clubs</h3>
           <div class="ratings-card-box">
-            ${p.memberships.map(m => `
-              <div class="rating-badge-item">
-                <div class="rating-icon" style="color: var(--primary-accent); background: rgba(0, 137, 207, 0.12);">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            ${p.memberships.map(m => {
+              const orgName = m.organisationName || 'SHV Verband';
+              const catM = resolveLocalizedString(m.mitgliedkategorie?.name || m.mitgliedkategorie, lang) || 'Mitglied';
+              const entryStr = m.eintrittsdatum ? `(Eintritt: ${m.eintrittsdatum})` : '';
+              return `
+                <div class="rating-badge-item">
+                  <div class="rating-icon" style="color: var(--primary-accent); background: rgba(0, 137, 207, 0.12);">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  </div>
+                  <div class="rating-info">
+                    <span class="rating-title">${orgName}</span>
+                    <span class="rating-status">${catM} ${entryStr}</span>
+                  </div>
                 </div>
-                <div class="rating-info">
-                  <span class="rating-title">${m.organisationName || 'SHV Verband'}</span>
-                  <span class="rating-status">${m.mitgliedkategorie?.name || 'Mitglied'} ${m.eintrittsdatum ? `(Eintritt: ${m.eintrittsdatum})` : ''}</span>
-                </div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
         </section>
       ` : ''}

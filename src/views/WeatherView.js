@@ -12,6 +12,7 @@ export class WeatherView {
     this.foehnData = null;
     this.measurementsData = null;
     this.webcamsData = null;
+    this.textForecastData = null;
     this.selectedPairId = 'KLO_LUG'; // 'KLO_LUG' | 'GVE_GUT' | 'PIL_MTR' | 'DEM_GRE'
     this.activeTab = 'stations'; // 'stations' | 'webcams'
     this.selectedProvider = 'ALL'; // 'ALL' | 'meteo_swiss' | 'slf'
@@ -32,15 +33,21 @@ export class WeatherView {
     `;
 
     try {
-      const [foehn, measurements, webcams] = await Promise.all([
+      const lang = store.state.lang || 'de';
+      const [foehn, measurements, webcams, textForecast] = await Promise.all([
         ShvApi.getFoehn(),
         ShvApi.getMeasurements(),
         ShvApi.getWebcams(),
+        ShvApi.getTextForecast(lang).catch(e => {
+          console.warn('[WeatherView] Text forecast fetch error:', e);
+          return null;
+        }),
       ]);
 
       this.foehnData = foehn;
       this.measurementsData = measurements;
       this.webcamsData = webcams;
+      this.textForecastData = textForecast?.forecast || null;
       this.render();
     } catch (e) {
       console.error('[WeatherView] Load error:', e);
@@ -99,6 +106,27 @@ export class WeatherView {
 
     this.container.innerHTML = `
       <div class="weather-view-wrapper">
+        <!-- 0. OFFICIAL METEOSCHWEIZ TEXT FORECAST (TEXTPROGNOSEN) -->
+        <section class="weather-section text-forecast-summary-card">
+          <div class="section-header-row">
+            <div>
+              <span class="badge-tag">MeteoSchweiz & SHV</span>
+              <h2 class="section-heading">Textprognosen</h2>
+              <p class="section-sub">Offizielles 3-Tage-Flugwetter für die Schweizer Alpen</p>
+            </div>
+            <div>
+              <button id="btn-goto-forecast" class="btn-primary" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                <span>Vollständige Prognose</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="forecast-preview-box">
+            ${this.renderTextForecastSnippet()}
+          </div>
+        </section>
+
         <!-- 1. OFFICIAL STATION DIFFERENCE PAIRS (4 OFFICIAL TRANSECTS) -->
         <section class="weather-section foehn-card">
           <div class="section-header-row">
@@ -271,6 +299,36 @@ export class WeatherView {
       this.initTimeseriesChart();
     }
     this.attachEvents();
+  }
+
+  renderTextForecastSnippet() {
+    if (!this.textForecastData || !this.textForecastData.text) {
+      return `
+        <div class="forecast-preview-teaser">
+          <p>MeteoSchweiz Flugwetter-Textprognose für die Alpennordseite, Zentralalpen und Alpensüdseite.</p>
+          <button class="btn-secondary" id="btn-snippet-jump" style="font-size: 0.82rem; margin-top: 8px;">
+            Zur Textprognose wechseln →
+          </button>
+        </div>
+      `;
+    }
+
+    const rawHtml = this.textForecastData.text['0'] || '';
+    const bodyMatch = rawHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    const content = bodyMatch ? bodyMatch[1] : rawHtml;
+
+    return `
+      <div class="forecast-snippet-wrapper">
+        <div class="prognosis-text-body snippet-clamped">
+          ${content}
+        </div>
+        <div class="snippet-action-bar">
+          <button class="btn-secondary" id="btn-snippet-jump" style="font-size: 0.85rem; font-weight: 600;">
+            Heute, Morgen & Übermorgen sowie Isobarenkarte anzeigen →
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   renderStationModal() {
@@ -498,6 +556,14 @@ export class WeatherView {
   }
 
   attachEvents() {
+    // Jump to dedicated Textprognosen tab
+    const forecastBtns = this.container.querySelectorAll('#btn-goto-forecast, #btn-snippet-jump');
+    forecastBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        store.setTab('forecast');
+      });
+    });
+
     // Pair Switcher
     this.container.querySelectorAll('.pair-pill-btn').forEach(btn => {
       btn.addEventListener('click', () => {
