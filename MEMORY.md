@@ -52,9 +52,12 @@ A high-performance, responsive web reproduction of the official **SHV FSVL** (Sc
   - Replaced silent `catch (e) {}` blocks across `ShvApi`, `AppState`, `VarioAudio`, and views with informative `console.error` logs.
   - Added in-memory dataset caching in `ShvApi` for `flyingsites`, `airspaces`, and `wildschutz` to eliminate redundant network roundtrips when navigating between views.
 - **Language Dropdown Display State**: The language popup `.lang-menu` was set to `display: flex;` in CSS without a `.lang-menu.hidden` or global `.hidden { display: none !important; }` rule, causing it to render permanently visible over the top-right of the map regardless of whether `.hidden` was present on the element. Added global `.hidden` and `.lang-menu.hidden` rules, plus a document-level outside click dismiss listener.
-- **Zero Fake Data Policy & Member Blocker**:
-  - Removed all mock/sample data (fake Marco Odermatt pilot profile, fake flights in logbook, simulated sounding parameters, server fallback stations).
-  - Sections requiring authentication (SHV Digital License/Brevet, Previtemps sounding and Flugwetter forecasts) now render the official SHV member blocker (*"Nur für Mitglieder"* - matching official APK `member_blocker_title` / `member_blocker_message`) with a member login form and links to the SHV member portal.
+- **Zero Fake Data Policy & Authentic Authentication Guard**:
+  - Removed all mock/sample data (fake Marco Odermatt pilot profile, fake flights in logbook, simulated sounding parameters, server fallback stations, and sine wave Föhn trend).
+  - Previously, `ProfileView.js` contained a client-side form handler that synthesized a fake pilot profile with dummy ratings (`['Brevet Gleitschirm']`) and fake insurance upon submit, resulting in "rubbish data" being rendered and persisted in `localStorage`.
+  - Removed the mock login generator completely. Updated `loadSavedProfile` in `AppState` (`src/state.js`) to automatically purge any legacy dummy profiles (`firstName === 'Pilot'`).
+  - Sections requiring authentication (SHV Digital License/Brevet, Previtemps sounding and Flugwetter forecasts) now faithfully display the official SHV member blocker (*"Nur für Mitglieder"* - matching official APK `member_blocker_title` / `member_blocker_message`) with links to the official SHV Keycloak Single Sign-On portal (`https://login.shv-fsvl.ch/realms/SHV/account/`) and member registration (`https://www.shv-fsvl.ch/verband/mitgliedschaft/`).
+  - The Föhn history on `/api/foehn` now tracks genuine live sampled Gotthard pressure observations in memory, rather than generating a synthetic mathematical sine wave.
   - The flight logbook in `SafetyView` starts cleanly with an empty state (*"Noch keine Flüge im Flugbuch erfasst"*).
   - All map features, airspaces, wildlife sanctuaries, weather stations, Föhn deltas, webcams, and Swisstopo WMTS layers continue streaming live, authentic Swiss datasets.
 - **Offline / Flight Mode Reliability**: Paragliders frequently launch in alpine areas with weak 4G/5G; local storage caching for sites, checklists, pilot license, and emergency contacts ensures offline access.

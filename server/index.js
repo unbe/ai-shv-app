@@ -21,6 +21,9 @@ const cache = {
   webcams: { data: null, timestamp: 0, ttl: 120 * 1000 },
 };
 
+// Real historical measurements buffer for Gotthard pressure difference
+const foehnRealHistory = [];
+
 // 1. Live Weather Measurements
 app.get('/api/measurements', async (req, res) => {
   const now = Date.now();
@@ -153,16 +156,23 @@ app.get('/api/foehn', async (req, res) => {
       descriptionEn = `Moderate North Föhn (${diffGotthard} hPa). Turbulent conditions in Ticino and southern valleys.`;
     }
 
-    // Historical trend mock data (past 12h) based on current value
-    const history = [];
-    const baseHour = new Date();
-    for (let i = 12; i >= 0; i--) {
-      const t = new Date(baseHour.getTime() - i * 3600 * 1000);
-      const timeStr = `${t.getHours().toString().padStart(2, '0')}:00`;
-      const wave = Math.sin(i * 0.4) * 0.8;
-      const histDiff = Math.round((diffGotthard - (i * 0.2) + wave) * 10) / 10;
-      history.push({ time: timeStr, diffHpa: histDiff });
+    // Record genuine real observation into historical buffer (no synthesized fake sine wave)
+    const nowTs = Date.now();
+    const lastSample = foehnRealHistory[foehnRealHistory.length - 1];
+    if (!lastSample || nowTs - lastSample.timestamp >= 5 * 60 * 1000) {
+      const nowD = new Date();
+      const timeStr = `${nowD.getHours().toString().padStart(2, '0')}:${nowD.getMinutes().toString().padStart(2, '0')}`;
+      foehnRealHistory.push({ time: timeStr, diffHpa: diffGotthard, timestamp: nowTs });
+      // Keep up to 24 hours of real readings
+      while (foehnRealHistory.length > 0 && nowTs - foehnRealHistory[0].timestamp > 24 * 3600 * 1000) {
+        foehnRealHistory.shift();
+      }
+    } else {
+      // Update most recent sample with latest precision
+      lastSample.diffHpa = diffGotthard;
     }
+
+    const history = foehnRealHistory.map(h => ({ time: h.time, diffHpa: h.diffHpa }));
 
     return res.json({
       primaryPair: {
@@ -264,13 +274,8 @@ app.get('/api/dabs', (req, res) => {
     bulletinUrl: 'https://www.skybriefing.com/de/dabs',
     bulletinPdfUrl: 'https://www.skybriefing.com/dabs/dabs.pdf',
     validity: `00:00 - 23:59 LT (${dateStr})`,
-    activeDangerAreas: [
-      { id: 'LS-D12', name: 'Alpnach Sector North', lower: 'GND', upper: 'FL 130', active: true },
-      { id: 'LS-R14', name: 'Wichlen Firing Range', lower: 'GND', upper: '4500m AMSL', active: false },
-      { id: 'LS-R17', name: 'Sion VFR Sector 2', lower: '1500m AMSL', upper: 'FL 150', active: true }
-    ],
-    notesDe: 'Täglich ab 16:00 LT für den Folgetag publiziert. Vor jedem Streckenflug obligatorisch zu konsultieren!',
-    notesEn: 'Published daily at 16:00 LT for the next day. Mandatory consultation prior to cross-country flights!'
+    notesDe: 'Täglich ab 16:00 LT für den Folgetag durch Skybriefing publiziert. Vor jedem Streckenflug obligatorisch zu konsultieren!',
+    notesEn: 'Published daily at 16:00 LT for the next day via Skybriefing. Mandatory consultation prior to cross-country flights!'
   });
 });
 

@@ -72,12 +72,20 @@ class AppState {
 
   loadSavedProfile() {
     try {
-      const data = localStorage.getItem('shv_profile');
-      if (data) return JSON.parse(data);
+      const raw = localStorage.getItem('shv_profile');
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      // Purge any previously synthesized dummy/rubbish profile data
+      if (!data || data.firstName === 'Pilot' || !data.firstName) {
+        localStorage.removeItem('shv_profile');
+        return null;
+      }
+      return data;
     } catch (e) {
       console.error('[AppState.loadSavedProfile] Failed to parse saved profile from localStorage:', e);
+      localStorage.removeItem('shv_profile');
+      return null;
     }
-    return null;
   }
 
   setProfile(profile) {

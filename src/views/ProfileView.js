@@ -4,6 +4,12 @@ export function renderProfileView(container) {
   const t = store.t;
   const p = store.state.profile;
 
+  // Ensure no dummy/rubbish profile is rendered
+  if (p && (p.firstName === 'Pilot' || !p.firstName)) {
+    store.logout();
+    return renderProfileView(container);
+  }
+
   if (!p) {
     container.innerHTML = `
       <div class="profile-view-wrapper">
@@ -17,70 +23,44 @@ export function renderProfileView(container) {
           <span class="badge-tag">SHV FSVL Mitgliederbereich</span>
           <h2 class="blocker-title">Nur für Mitglieder</h2>
           <p class="blocker-text">
-            Dieser Inhalt ist aktiven SHV-Mitgliedern vorbehalten. Melde dich mit deiner Mitgliedsnummer und deinem Passwort an, um deine offizielle digitale Mitgliederkarte, deinen Hängegleiterausweis (Brevet) und deine Versicherungsnachweise abzurufen.
+            Dieser Bereich ist ausschliesslich aktiven Mitgliedern des Schweizerischen Hängegleiter-Verbandes vorbehalten. Die offizielle digitale Mitgliederkarte, der Hängegleiterausweis (Brevet) und die Versicherungsnachweise erfordern einen Login über den offiziellen SHV-Verbandsserver (Keycloak SSO).
           </p>
 
-          <form id="shv-login-form" class="login-form-box">
-            <div class="form-group">
-              <label for="login-member-nr">SHV-Mitgliedsnummer / E-Mail</label>
-              <input type="text" id="login-member-nr" placeholder="z. B. 58412 oder pilot@domain.ch" required autocomplete="username" />
+          <div class="auth-notice-box" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin: 18px 0; text-align: left; font-size: 0.88rem; line-height: 1.45; color: var(--text-muted);">
+            <div style="font-weight: 600; color: var(--text-main); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              Authentische Verbandsdaten
             </div>
-            <div class="form-group">
-              <label for="login-password">Passwort</label>
-              <input type="password" id="login-password" placeholder="Passwort" required autocomplete="current-password" />
-            </div>
-            <button type="submit" class="btn-primary btn-login-submit">
-              <span>Jetzt anmelden</span>
-            </button>
-            <div class="login-links-row">
-              <a href="https://www.shv-fsvl.ch" target="_blank" rel="noopener">Passwort vergessen? ↗</a>
-              <a href="https://www.shv-fsvl.ch/verband/mitgliedschaft/" target="_blank" rel="noopener">Mitglied werden ↗</a>
-            </div>
-          </form>
+            Aus Datenschutz- und Sicherheitsgründen werden keine synthetischen Dummy- oder Testdaten angezeigt und keine Passwörter in dieser Web-App erfasst. Bitte nutze für Verwaltungsaufgaben und Ausweise das offizielle Verbandsportal.
+          </div>
+
+          <div class="blocker-actions-column" style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 380px; margin: 0 auto;">
+            <a href="https://login.shv-fsvl.ch/realms/SHV/account/" target="_blank" rel="noopener" class="btn-primary btn-login-submit" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
+              <span>Offizielles SHV Login (login.shv-fsvl.ch) ↗</span>
+            </a>
+            <a href="https://www.shv-fsvl.ch/verband/mitgliedschaft/" target="_blank" rel="noopener" class="btn-secondary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
+              <span>Mitgliedschaft beim SHV beantragen ↗</span>
+            </a>
+          </div>
+
+          <div class="login-links-row" style="margin-top: 20px; display: flex; justify-content: center; gap: 20px; font-size: 0.85rem;">
+            <a href="https://login.shv-fsvl.ch/realms/SHV/login-actions/reset-credentials" target="_blank" rel="noopener" style="color: var(--primary-accent); text-decoration: none;">Passwort vergessen? ↗</a>
+            <a href="https://www.shv-fsvl.ch" target="_blank" rel="noopener" style="color: var(--primary-accent); text-decoration: none;">SHV FSVL Website ↗</a>
+          </div>
         </div>
       </div>
     `;
-
-    const form = container.querySelector('#shv-login-form');
-    if (form) {
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const nr = container.querySelector('#login-member-nr').value.trim();
-        const pass = container.querySelector('#login-password').value;
-
-        if (!nr || !pass) return;
-
-        // Save authenticated pilot profile
-        const pilotData = {
-          shvNumber: nr,
-          firstName: 'Pilot',
-          lastName: nr,
-          birthDate: '–',
-          canton: 'CH',
-          memberCategory: 'Aktivmitglied Pilot',
-          ratings: ['Brevet Gleitschirm'],
-          validUntil: 'Aktiv',
-          club: 'SHV FSVL',
-          insuranceCompany: 'SHV Kollektivversicherung',
-          insuranceCoverage: 'CHF 10\'000\'000.-',
-          token: `SHV-${nr}`,
-        };
-
-        store.setProfile(pilotData);
-        renderProfileView(container);
-      });
-    }
     return;
   }
 
-  // Render Logged In Profile
+  // Render Logged In Profile (only when genuine profile data is present)
   container.innerHTML = `
     <div class="profile-view-wrapper">
       <div class="profile-top-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
         <div>
           <span class="badge-tag">Digitale Mitgliedschaft</span>
           <h2 class="section-heading">${p.firstName} ${p.lastName}</h2>
-          <p class="section-sub">SHV-Nr. ${p.shvNumber} · ${p.memberCategory}</p>
+          <p class="section-sub">SHV-Nr. ${p.shvNumber} · ${p.memberCategory || 'Mitglied'}</p>
         </div>
         <div>
           <button id="btn-logout" class="btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">
@@ -118,54 +98,58 @@ export function renderProfileView(container) {
             <div class="card-footer-line">
               <div class="footer-col">
                 <span class="card-sub-lbl">Kategorie</span>
-                <span class="card-sub-val">${p.memberCategory}</span>
+                <span class="card-sub-val">${p.memberCategory || '–'}</span>
               </div>
               <div class="footer-col">
                 <span class="card-sub-lbl">Kanton</span>
-                <span class="card-sub-val">${p.canton}</span>
+                <span class="card-sub-val">${p.canton || '–'}</span>
               </div>
               <div class="footer-col text-right">
                 <span class="card-sub-lbl">${t.profile.validUntil}</span>
-                <span class="card-sub-val text-bold">${p.validUntil}</span>
+                <span class="card-sub-val text-bold">${p.validUntil || '–'}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 2. PILOT RATINGS / BREVET -->
-      <section class="profile-section">
-        <h3 class="section-heading-sm">Berechtigungen & Lizenzen</h3>
-        <div class="ratings-card-box">
-          ${p.ratings.map(r => `
-            <div class="rating-badge-item">
-              <div class="rating-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      <!-- 2. PILOT RATINGS / BREVET (if provided) -->
+      ${Array.isArray(p.ratings) && p.ratings.length > 0 ? `
+        <section class="profile-section">
+          <h3 class="section-heading-sm">Berechtigungen & Lizenzen</h3>
+          <div class="ratings-card-box">
+            ${p.ratings.map(r => `
+              <div class="rating-badge-item">
+                <div class="rating-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div class="rating-info">
+                  <span class="rating-title">${r}</span>
+                  <span class="rating-status">Aktiv · SHV Brevet</span>
+                </div>
               </div>
-              <div class="rating-info">
-                <span class="rating-title">${r}</span>
-                <span class="rating-status">Aktiv · Geprüft durch SHV Prüfungskommission</span>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </section>
+            `).join('')}
+          </div>
+        </section>
+      ` : ''}
 
-      <!-- 3. LIABILITY INSURANCE STATUS -->
-      <section class="profile-section">
-        <h3 class="section-heading-sm">${t.profile.insuranceTitle}</h3>
-        <div class="insurance-card-box">
-          <div class="ins-top">
-            <span class="ins-amount">${p.insuranceCoverage}</span>
-            <span class="ins-status-badge">Gültig versichert</span>
+      <!-- 3. LIABILITY INSURANCE STATUS (if provided) -->
+      ${p.insuranceCoverage ? `
+        <section class="profile-section">
+          <h3 class="section-heading-sm">${t.profile.insuranceTitle}</h3>
+          <div class="insurance-card-box">
+            <div class="ins-top">
+              <span class="ins-amount">${p.insuranceCoverage}</span>
+              <span class="ins-status-badge">Gültig versichert</span>
+            </div>
+            <p class="ins-notice">${t.profile.insuranceNotice}</p>
+            <div class="ins-meta">
+              ${p.insuranceCompany ? `<span>Versicherer: ${p.insuranceCompany}</span>` : ''}
+              ${p.club ? `<span>Club: <strong>${p.club}</strong></span>` : ''}
+            </div>
           </div>
-          <p class="ins-notice">${t.profile.insuranceNotice}</p>
-          <div class="ins-meta">
-            <span>Versicherer: ${p.insuranceCompany}</span>
-            <span>Club: <strong>${p.club}</strong></span>
-          </div>
-        </div>
-      </section>
+        </section>
+      ` : ''}
     </div>
   `;
 
