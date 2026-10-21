@@ -209,8 +209,15 @@ The app integrates live telemetry and static GIS layers across Switzerland:
         └── ch.swisstopo.pixelkarte-grau   -> Grey / relief basemap
 ```
 
-### Spatial Geometries & Centroid Calculation
-While launch sites are usually `Point` features, landing zones, airfield traffic circuits, and launch areas in `flyingsites.geojson` are often formatted as `Polygon`, `MultiPolygon`, or `LineString` geometries. To prevent Leaflet projection crashes (`TypeError: Cannot read properties of null (reading 'lat')`), the application computes the geometric centroid across polygon coordinate rings before placing map markers.
+### Flying Sites Data Model & Layer Separation
+The SHV flying sites spatial dataset (`public/data/flyingsites.geojson`) contains 1,341 total features representing take-offs, landings, perimeter boundaries, and auxiliary facilities:
+- **Interactive Map Pins**: Strictly filtered to `type === 'launch'` (358 take-offs) and `type === 'landing'` (199 landings). Perimeter boundaries (`launcharea`, `landingarea`, `landingpattern`, `access`, `parking`) are preserved in spatial indexing but excluded from generating redundant point markers, ensuring 100% of clickable pins possess valid, official `siteName` values and eliminating generic `"Unbenannter Flugplatz"` placeholders.
+- **Parent Site Resolution (`siteId`)**: Auxiliary features (parking, obstacles, landing circuits) link to their primary site via `siteId`. If any feature lacks explicit name attributes, its parent metadata (site name, altitude, rules, club) is inherited automatically from the primary `launch` or `landing` entity.
+- **Fees & Payment Integration**:
+  - `fees`: Official landing and takeoff fee policies (e.g. Unterleimbach Fr. 5.– Tageskarte / Fr. 40.– Jahreskarte).
+  - `feePaymentLink`: Deep link to online digital payment providers (e.g. RaiseNow / Twint).
+  - `feeQrCodeUrl`: Official Swiss Twint payment QR code rendered for immediate on-site scanning.
+- **Operational Badges**: Renders flight suitability (`paraglider`, `hangglider`, `speedflyer`, `toplanding`, `hikeAndFly`, `soaring`, `crossCountry`), access mode (`accessibleByCar`, `publicTransport`), difficulty level (`easy`, `moderate`, `difficult`), and opening status (`open`, `closed` / shooting range warnings).
 
 ### Alpine Pressure & Temperature Difference Transects
 The native app computes exactly four official station pairs across Switzerland (`PressureDifferenceGeoJsonTransformer.c`):

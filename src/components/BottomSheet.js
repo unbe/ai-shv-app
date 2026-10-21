@@ -14,11 +14,21 @@ export function renderBottomSheet(container) {
 
   // 1. FLYING SITE DETAILS
   if (selectedSite) {
-    const p = selectedSite.properties || {};
+    let p = selectedSite.properties || {};
+
+    // If siteName is missing, resolve from parent primary site via siteId
+    if (p.siteId && store.state.flyingSitesById?.[p.siteId]) {
+      const parent = store.state.flyingSitesById[p.siteId];
+      p = { ...parent, ...p, siteName: p.siteName || parent.siteName };
+    }
+
     const latLng = getSiteCenterLatLng(selectedSite) || [46.8, 8.2];
     const [lat, lng] = latLng;
-    const isLaunch = p.type === 'launch' || p.type === 'launcharea';
-    const isLanding = p.type === 'landing' || p.type === 'landingarea' || p.type === 'landingpattern';
+    const type = (p.type || '').toLowerCase();
+    const isLaunch = type === 'launch' || type === 'launcharea';
+    const isLanding = type === 'landing' || type === 'landingarea' || type === 'landingpattern';
+
+    const displayName = p.siteName || p.description || (isLaunch ? 'Startplatz' : isLanding ? 'Landeplatz' : 'Fluggebiet');
 
     // Compass wind rose tags
     const launchDirs = p.launchDirections || [];
@@ -28,6 +38,42 @@ export function renderBottomSheet(container) {
       return `<span class="wind-tag ${isOk ? 'wind-ok' : 'wind-no'}">${d}</span>`;
     }).join('');
 
+    // Difficulty badge
+    let difficultyBadge = '';
+    if (p.difficulty) {
+      const diffMap = {
+        easy: { label: 'Einfach', class: 'badge-diff-easy' },
+        moderate: { label: 'Mittel', class: 'badge-diff-moderate' },
+        difficult: { label: 'Anspruchsvoll', class: 'badge-diff-difficult' },
+      };
+      const d = diffMap[p.difficulty.toLowerCase()] || { label: p.difficulty, class: 'badge-diff-moderate' };
+      difficultyBadge = `<span class="sheet-badge ${d.class}">${d.label}</span>`;
+    }
+
+    // Opening Status badge
+    let statusBadge = '';
+    if (p.openingStatus) {
+      const st = p.openingStatus.toLowerCase();
+      if (st === 'open') {
+        statusBadge = `<span class="sheet-badge badge-status-open">🟢 Geöffnet</span>`;
+      } else if (st === 'closed') {
+        statusBadge = `<span class="sheet-badge badge-status-closed">🔴 Geschlossen</span>`;
+      }
+    }
+
+    // Suitability pills (paraglider, hangglider, toplanding, hike & fly, etc.)
+    const suitabilityBadges = [];
+    if (p.paraglider) suitabilityBadges.push('🪂 Gleitschirm');
+    if (p.hangglider) suitabilityBadges.push('🪁 Delta / Hängegleiter');
+    if (p.speedflyer) suitabilityBadges.push('⚡ Speedflyer');
+    if (p.toplanding) suitabilityBadges.push('🎯 Toplandung');
+    if (p.soaring) suitabilityBadges.push('🌊 Soaring');
+    if (p.crossCountry) suitabilityBadges.push('🦅 Streckenflug (XC)');
+    if (p.hikeAndFly) suitabilityBadges.push('🥾 Hike & Fly');
+    if (p.groundhandling) suitabilityBadges.push('🌾 Groundhandling');
+    if (p.accessibleByCar) suitabilityBadges.push('🚗 Auto-Zufahrt');
+    if (p.publicTransport) suitabilityBadges.push('🚊 ÖV / Bergbahn');
+
     container.innerHTML = `
       <div class="sheet-scrim" id="sheet-scrim"></div>
       <div class="sheet-content">
@@ -35,10 +81,14 @@ export function renderBottomSheet(container) {
 
         <div class="sheet-header">
           <div class="sheet-title-group">
-            <span class="sheet-badge ${isLaunch ? 'badge-launch' : isLanding ? 'badge-landing' : 'badge-general'}">
-              ${isLaunch ? 'Startplatz (Take-off)' : isLanding ? 'Landeplatz (Landing)' : (p.type || 'Fluggebiet')}
-            </span>
-            <h2 class="sheet-title">${p.siteName || 'Unbenannter Flugplatz'}</h2>
+            <div class="sheet-badges-row">
+              <span class="sheet-badge ${isLaunch ? 'badge-launch' : isLanding ? 'badge-landing' : 'badge-general'}">
+                ${isLaunch ? 'Startplatz (Take-off)' : isLanding ? 'Landeplatz (Landing)' : (p.type || 'Fluggebiet')}
+              </span>
+              ${difficultyBadge}
+              ${statusBadge}
+            </div>
+            <h2 class="sheet-title">${escapeHtml(displayName)}</h2>
             <div class="sheet-meta">
               <span class="meta-item">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>
@@ -54,7 +104,25 @@ export function renderBottomSheet(container) {
         </div>
 
         <div class="sheet-body">
-          ${isLaunch ? `
+          <!-- Suitability & Category Badges -->
+          ${suitabilityBadges.length > 0 ? `
+            <div class="suitability-pills-row">
+              ${suitabilityBadges.map(b => `<span class="suitability-pill">${b}</span>`).join('')}
+            </div>
+          ` : ''}
+
+          <!-- Opening Info Notice -->
+          ${p.openingInfo ? `
+            <div class="sheet-section section-opening" style="background: rgba(0, 137, 207, 0.08); border-left: 3px solid var(--shv-blue); padding: 10px 12px; border-radius: 0 8px 8px 0;">
+              <h4 class="section-title" style="color: var(--shv-blue);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Status & Flugbetrieb
+              </h4>
+              <p class="section-text">${escapeHtml(p.openingInfo).replace(/\n/g, '<br/>')}</p>
+            </div>
+          ` : ''}
+
+          ${isLaunch && launchDirs.length > 0 ? `
             <!-- Wind Suitability -->
             <div class="sheet-section">
               <h4 class="section-title">
@@ -78,7 +146,7 @@ export function renderBottomSheet(container) {
             </div>
           ` : ''}
 
-          <!-- Hazards -->
+          <!-- Hazards & Specifics -->
           ${p.hazards ? `
             <div class="sheet-section section-warning">
               <h4 class="section-title text-warning">
@@ -100,6 +168,32 @@ export function renderBottomSheet(container) {
             </div>
           ` : ''}
 
+          <!-- Start- & Landegebühren (Fees) -->
+          ${p.fees ? `
+            <div class="sheet-section section-fees" style="background: rgba(0, 165, 81, 0.08); border: 1px solid rgba(0, 165, 81, 0.25); border-radius: 12px; padding: 14px;">
+              <h4 class="section-title" style="color: #00A551; margin-bottom: 6px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                ${t.map.fees || 'Start- & Landegebühr / Twint'}
+              </h4>
+              <p class="section-text" style="line-height: 1.5;">${escapeHtml(p.fees).replace(/\n/g, '<br/>')}</p>
+
+              ${p.feePaymentLink ? `
+                <div class="fee-action-row" style="margin-top: 10px;">
+                  <a href="${p.feePaymentLink}" target="_blank" rel="noopener" class="btn-action btn-pay" style="display: inline-flex; align-items: center; gap: 8px; background: #00A551; color: #FFFFFF; font-weight: 700; font-size: 0.85rem; padding: 10px 16px; border-radius: 10px; text-decoration: none;">
+                    <span>💳</span> Gebühr online / Twint bezahlen ↗
+                  </a>
+                </div>
+              ` : ''}
+
+              ${p.feeQrCodeUrl ? `
+                <div class="fee-qr-wrapper" style="margin-top: 12px; display: inline-flex; flex-direction: column; align-items: center; background: #FFFFFF; padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+                  <img src="${p.feeQrCodeUrl}" alt="Twint QR-Code" style="width: 140px; height: 140px; object-fit: contain; border-radius: 6px;" />
+                  <span style="font-size: 0.74rem; color: #334155; margin-top: 6px; font-weight: 700;">Twint QR-Code vor Ort scannen</span>
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
+
           <!-- Responsible Club -->
           ${p.responsible ? `
             <div class="sheet-section">
@@ -108,7 +202,7 @@ export function renderBottomSheet(container) {
                 ${t.map.responsible}
               </h4>
               <div class="club-row">
-                <span class="club-name">${p.responsible}</span>
+                <span class="club-name">${escapeHtml(p.responsible)}</span>
                 ${p.clubLink ? `<a href="${p.clubLink}" target="_blank" rel="noopener" class="btn-link">Website ↗</a>` : ''}
               </div>
             </div>
@@ -148,32 +242,47 @@ export function renderBottomSheet(container) {
             <span class="sheet-badge badge-station">Live Wetterstation</span>
             <h2 class="sheet-title">${p.name || 'Wetterstation'}</h2>
             <div class="sheet-meta">
-              <span class="meta-item">${p.altitude ? `${p.altitude} m ü. M.` : ''}</span>
-              <span class="meta-item">Provider: ${(p.providerKey || 'MeteoSchweiz').toUpperCase()}</span>
+              <span class="meta-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>
+                ${p.altitude ? `${p.altitude} m ü. M.` : 'Höhe n/a'}
+              </span>
+              <span class="meta-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                ${coords[1].toFixed(4)}° N, ${coords[0].toFixed(4)}° E
+              </span>
             </div>
           </div>
           <button class="sheet-close" id="sheet-close-btn">&times;</button>
         </div>
 
         <div class="sheet-body">
-          <div class="station-grid-card">
-            <div class="stat-box">
-              <span class="stat-label">${t.weather.wind}</span>
-              <span class="stat-val">${windSpeedKmH !== null ? `${windSpeedKmH} km/h` : 'n/a'}</span>
-              <span class="stat-sub">${p.windDirectionValue ? `${Math.round(p.windDirectionValue)}°` : ''}</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-label">${t.weather.gust}</span>
-              <span class="stat-val text-warning">${windGustKmH !== null ? `${windGustKmH} km/h` : 'n/a'}</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-label">${t.weather.temp}</span>
-              <span class="stat-val">${tempC !== null ? `${tempC}°C` : 'n/a'}</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-label">${t.weather.pressure}</span>
-              <span class="stat-val">${qnh ? `${qnh} hPa` : 'n/a'}</span>
-            </div>
+          <div class="station-metrics-grid">
+            ${windSpeedKmH !== null ? `
+              <div class="metric-card">
+                <span class="metric-lbl">Wind</span>
+                <span class="metric-val">${windSpeedKmH} km/h</span>
+                ${windGustKmH ? `<span class="metric-sub">Böen: ${windGustKmH} km/h</span>` : ''}
+              </div>
+            ` : ''}
+            ${tempC !== null ? `
+              <div class="metric-card">
+                <span class="metric-lbl">Temperatur</span>
+                <span class="metric-val">${tempC} °C</span>
+              </div>
+            ` : ''}
+            ${qnh !== null ? `
+              <div class="metric-card">
+                <span class="metric-lbl">Druck (QNH)</span>
+                <span class="metric-val">${qnh} hPa</span>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="sheet-actions">
+            <a href="https://maps.apple.com/?daddr=${coords[1]},${coords[0]}" target="_blank" class="btn-action btn-nav">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+              ${t.map.openInMaps}
+            </a>
           </div>
         </div>
       </div>
@@ -181,31 +290,34 @@ export function renderBottomSheet(container) {
   }
   // 3. WEBCAM DETAILS
   else if (selectedWebcam) {
-    const wc = selectedWebcam;
+    const p = selectedWebcam.properties || {};
+    const imgUrl = p.mediumResolutionImageUrl || p.thumbnailUrl || p.highResolutionImageUrl;
+
     container.innerHTML = `
       <div class="sheet-scrim" id="sheet-scrim"></div>
-      <div class="sheet-content">
+      <div class="sheet-content sheet-webcam-content">
         <div class="sheet-drag-handle"></div>
 
         <div class="sheet-header">
           <div class="sheet-title-group">
             <span class="sheet-badge badge-webcam">Live Webcam</span>
-            <h2 class="sheet-title">${wc.name || 'Webcam'}</h2>
-            <div class="sheet-meta">
-              <span>${wc.altitudeM ? `${Math.round(wc.altitudeM)} m ü. M.` : ''}</span>
-              <span>${wc.providerDisplayName || ''}</span>
-            </div>
+            <h2 class="sheet-title">${p.title || p.name || 'Webcam'}</h2>
           </div>
           <button class="sheet-close" id="sheet-close-btn">&times;</button>
         </div>
 
         <div class="sheet-body">
-          <div class="webcam-viewer">
-            <img src="${wc.latestImageUrl}" alt="${wc.name}" class="webcam-img" onerror="this.src='${wc.thumbnailUrl}'"/>
-          </div>
-          ${wc.providerUrl ? `
-            <div class="mt-2 text-right">
-              <a href="${wc.providerUrl}" target="_blank" rel="noopener" class="btn-link">Quelle: ${wc.providerDisplayName} ↗</a>
+          ${imgUrl ? `
+            <div class="webcam-viewer">
+              <img src="${imgUrl}" alt="${p.title || 'Webcam'}" class="webcam-img" loading="eager" />
+            </div>
+          ` : '<p class="error-notice">Kein Bild verfügbar</p>'}
+
+          ${p.liveUrl ? `
+            <div class="sheet-actions">
+              <a href="${p.liveUrl}" target="_blank" rel="noopener" class="btn-action btn-nav">
+                <span>Webcam Vollbild ↗</span>
+              </a>
             </div>
           ` : ''}
         </div>
@@ -213,16 +325,18 @@ export function renderBottomSheet(container) {
     `;
   }
 
-  // Close event
+  // Event handlers
   const closeBtn = container.querySelector('#sheet-close-btn');
   const scrim = container.querySelector('#sheet-scrim');
-  const close = () => {
+
+  const closeSheet = () => {
     store.selectSite(null);
     store.selectStation(null);
     store.selectWebcam(null);
   };
-  if (closeBtn) closeBtn.addEventListener('click', close);
-  if (scrim) scrim.addEventListener('click', close);
+
+  if (closeBtn) closeBtn.addEventListener('click', closeSheet);
+  if (scrim) scrim.addEventListener('click', closeSheet);
 }
 
 function getSiteCenterLatLng(feature) {

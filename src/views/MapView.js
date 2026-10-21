@@ -543,14 +543,24 @@ export class MapView {
 
     if (!this.rawFlyingSites || !this.rawFlyingSites.features) return;
 
+    // Index primary sites by siteId to resolve names/metadata for any auxiliary features
+    const sitesById = {};
+    for (const f of this.rawFlyingSites.features) {
+      if (f.properties?.siteId && f.properties?.siteName) {
+        sitesById[f.properties.siteId] = f.properties;
+      }
+    }
+    store.state.flyingSitesById = sitesById;
+
     const { searchQuery, windFilter } = store.state;
     const query = (searchQuery || '').trim().toLowerCase();
 
     for (const feature of this.rawFlyingSites.features) {
       const p = feature.properties || {};
       const type = (p.type || '').toLowerCase();
-      const isLaunch = type === 'launch' || type === 'launcharea';
-      const isLanding = type === 'landing' || type === 'landingarea' || type === 'landingpattern';
+      // Primary map markers are launch and landing points only (matching native SHV app)
+      const isLaunch = type === 'launch';
+      const isLanding = type === 'landing';
 
       if (!isLaunch && !isLanding) continue;
 
