@@ -56,7 +56,7 @@ export const de = {
     frequency: 'Frequenz'
   },
   weather: {
-    foehnTitle: 'Föhn-Druckdifferenz (Alpentransekt)',
+    foehnTitle: 'Druckdifferenz (QNH)',
     foehnSub: 'Nord-Süd Luftdruckgradient über den Gotthard',
     gotthardAxis: 'Lugano - Zürich/Kloten',
     reusstalAxis: 'Lugano - Altdorf',

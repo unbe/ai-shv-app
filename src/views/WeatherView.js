@@ -67,7 +67,7 @@ export class WeatherView {
         <section class="weather-section foehn-card">
           <div class="section-header-row">
             <div>
-              <span class="badge-tag">Alpentransekt</span>
+              <span class="badge-tag">Stationspaare</span>
               <h2 class="section-heading">${t.weather.foehnTitle}</h2>
               <p class="section-sub">${t.weather.foehnSub}</p>
             </div>

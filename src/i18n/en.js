@@ -56,7 +56,7 @@ export const en = {
     frequency: 'Frequency'
   },
   weather: {
-    foehnTitle: 'Föhn Pressure Difference (Alps Transect)',
+    foehnTitle: 'Pressure Difference (QNH)',
     foehnSub: 'North-South barometric gradient across Gotthard pass',
     gotthardAxis: 'Lugano - Zurich/Kloten',
     reusstalAxis: 'Lugano - Altdorf',
