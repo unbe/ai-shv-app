@@ -145,6 +145,10 @@ export function renderHeader(container) {
       langMenu.classList.toggle('hidden');
     });
 
+    langMenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
     langMenu.querySelectorAll('button').forEach(btn => {
       btn.addEventListener('click', () => {
         const selectedLang = btn.getAttribute('data-lang');
@@ -153,8 +157,11 @@ export function renderHeader(container) {
       });
     });
 
-    document.addEventListener('click', () => {
-      langMenu.classList.add('hidden');
-    }, { once: true });
+    // Close when clicking anywhere outside the language dropdown
+    document.addEventListener('click', (e) => {
+      if (!btnLang.contains(e.target) && !langMenu.contains(e.target)) {
+        langMenu.classList.add('hidden');
+      }
+    });
   }
 }

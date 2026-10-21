@@ -230,6 +230,10 @@ body {
   cursor: pointer;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .lang-menu {
   position: absolute;
   top: 42px;
@@ -243,6 +247,10 @@ body {
   flex-direction: column;
   min-width: 130px;
   z-index: 1200;
+}
+
+.lang-menu.hidden {
+  display: none !important;
 }
 
 .lang-menu button {
