@@ -236,8 +236,8 @@ export class WeatherView {
             <div class="stations-cards-grid">
               ${stations.slice(0, 48).map(st => {
                 const p = st.properties || {};
-                const windSpeed = p.windSpeedValue ? Math.round(p.windSpeedValue * 3.6) : null;
-                const windGust = p.windGustValue ? Math.round(p.windGustValue * 3.6) : null;
+                const windSpeed = (p.windSpeedValue !== undefined && p.windSpeedValue !== null) ? Math.round(p.windSpeedValue) : null;
+                const windGust = (p.windGustValue !== undefined && p.windGustValue !== null) ? Math.round(p.windGustValue) : null;
                 const dir = p.windDirectionValue || 0;
                 const rawT = p.temperature2mValue ?? p.temperatureValue;
                 const temp = rawT ? (rawT > 200 ? Math.round((rawT - 273.15) * 10) / 10 : Math.round(rawT * 10) / 10) : null;
@@ -349,8 +349,8 @@ export class WeatherView {
     const rawDew = p.dewPoint2mValue;
     const dewC = rawDew ? (rawDew > 200 ? Math.round((rawDew - 273.15) * 10) / 10 : Math.round(rawDew * 10) / 10) : null;
     const humidity = p.relativeHumidity2mValue ?? p.relativeHumidityValue;
-    const windSpeedKmH = p.windSpeedValue ? Math.round(p.windSpeedValue * 3.6) : null;
-    const windGustKmH = p.windGustValue ? Math.round(p.windGustValue * 3.6) : null;
+    const windSpeedKmH = (p.windSpeedValue !== undefined && p.windSpeedValue !== null) ? Math.round(p.windSpeedValue * 10) / 10 : null;
+    const windGustKmH = (p.windGustValue !== undefined && p.windGustValue !== null) ? Math.round(p.windGustValue * 10) / 10 : null;
     const rawQnh = p.pressureMslValue ?? p.pressureStandardMslValue;
     const qnh = rawQnh ? (rawQnh > 5000 ? Math.round(rawQnh / 10) : Math.round(rawQnh)) : null;
 
@@ -500,7 +500,7 @@ export class WeatherView {
       : [];
 
     const windData = windSerie
-      ? windSerie.measurements.map(m => Math.round(m.value * 3.6))
+      ? windSerie.measurements.map(m => Math.round(m.value * 10) / 10)
       : [];
 
     const isDark = store.state.theme === 'dark';

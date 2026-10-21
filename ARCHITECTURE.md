@@ -242,6 +242,20 @@ The native app computes exactly four official station pairs across Switzerland (
    - **South**: Grenchen (`meteo_swiss:GRE`, 428m AMSL)
    - **Calculation**: $\Delta p = p_{\text{Grenchen}} - p_{\text{Delémont}}$ in hPa (cross-Jura pressure gradient).
 
+### Telemetry Units & Data Normalization Standards
+Ubique Fluid Meteo Services (`weather-ws-prod.ubmeteo.io`) delivers real-time weather observations with specific unit standards verified against the Android APK decompression (`apk_analysis/unpacked/assets/map/layers/measurement_wind/style.json`):
+- **Wind Speed (`windSpeedValue`) & Gusts (`windGustValue`)**: Values are natively in **km/h** (not m/s). Do **not** multiply by 3.6. Multiplying causes massive over-reporting (e.g. Uetliberg 40.3 km/h showing as 145 km/h).
+- **Temperatures (`temperatureValue`, `temperature2mValue`, `dewPoint2mValue`)**: If raw value $> 200$, it is expressed in Kelvin and must be converted via $T(^\circ\text{C}) = T(\text{K}) - 273.15$. Values $\le 200$ are natively in Celsius.
+- **Atmospheric Pressure (`pressureMslValue`, `pressureStandardMslValue`)**: Scaled in raw tenths or Pa in some sensors. If raw value $> 5000$, divide by 10 to obtain standard hectopascals (hPa / QNH).
+
+### Flying Sites GeoJSON & Fee Rules
+The official flying sites GeoJSON (`shv-app-static.ubmeteo.io/v1/shv_app/geodata/flyingsites.geojson`) contains primary site points and auxiliary geometry (areas, landing patterns):
+- **Feature Filtering**: Primary point markers must match `type === 'launch'` (358 launch sites) or `type === 'landing'` (199 landing sites). Auxiliary polygon features (`launcharea`, `landingarea`, `landingpattern`) frequently lack `siteName` and must not produce duplicate `"Unbenannter Flugplatz"` pins. An index `flyingSitesById` maps any auxiliary entity back to its parent metadata.
+- **Start- und Landegebühr (Fees & Digital Payments)**: Landing sites such as *Unterleimbach* or *Balderen* specify mandatory pilot site fees:
+  - `fees`: Detailed textual fee regulations and local club tariffs.
+  - `feePaymentLink`: Official RaiseNow / club web payment link.
+  - `feeQrCodeUrl`: Dynamic Twint QR-Code for mobile payment integration rendered directly within the site bottom sheet.
+
 ### Live Map Meteo Modes (`LiveMapMeteoType`)
 The official application organizes real-time meteo into 5 distinct modes (`LiveMapMeteoType`):
 - `WIND`: Displays station wind vectors with direction arrows, speed, and gust tags colored by wind intensity.

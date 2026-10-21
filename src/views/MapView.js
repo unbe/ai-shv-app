@@ -804,8 +804,8 @@ export class MapView {
 
       } else {
         // Wind Mode (Wind speed & direction arrows)
-        if (!p.windSpeedValue) continue;
-        const speedKmH = Math.round(p.windSpeedValue * 3.6);
+        if (p.windSpeedValue === undefined || p.windSpeedValue === null) continue;
+        const speedKmH = Math.round(p.windSpeedValue);
         const dirDeg = p.windDirectionValue || 0;
 
         let speedClass = 'speed-calm';

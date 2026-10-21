@@ -227,8 +227,8 @@ export function renderBottomSheet(container) {
   else if (selectedStation) {
     const p = selectedStation.properties || {};
     const coords = selectedStation.geometry?.coordinates || [0, 0];
-    const windSpeedKmH = p.windSpeedValue ? Math.round(p.windSpeedValue * 3.6) : null;
-    const windGustKmH = p.windGustValue ? Math.round(p.windGustValue * 3.6) : null;
+    const windSpeedKmH = (p.windSpeedValue !== undefined && p.windSpeedValue !== null) ? Math.round(p.windSpeedValue * 10) / 10 : null;
+    const windGustKmH = (p.windGustValue !== undefined && p.windGustValue !== null) ? Math.round(p.windGustValue * 10) / 10 : null;
     const tempC = p.temperatureValue ? (p.temperatureValue > 200 ? Math.round((p.temperatureValue - 273.15) * 10) / 10 : Math.round(p.temperatureValue * 10) / 10) : null;
     const qnh = p.pressureStandardMslValue ? (p.pressureStandardMslValue > 5000 ? Math.round(p.pressureStandardMslValue / 10) : Math.round(p.pressureStandardMslValue)) : null;
 
