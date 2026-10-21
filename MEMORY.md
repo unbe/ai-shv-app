@@ -18,6 +18,9 @@ A high-performance, responsive web reproduction of the official **SHV FSVL** (Sc
    - `https://shv-app-static-prod.ubmeteo.io/v1/wildschutz/shv.geojson`: 51 Swiss wildlife sanctuaries with mandatory 300m AGL minimum altitude or seasonal prohibitions.
    - `https://weather-ws-prod.ubmeteo.io/v1/measurements/current`: 620+ live Swiss weather stations with wind speed, gusts, direction, temperature, and MSL pressure.
    - `https://webcam-prod.ubmeteo.io/v1/webcams/overview`: Alpine mountain webcams with real-time imagery.
+   - `https://login.shv-fsvl.ch/realms/SHV/`: Official Keycloak Identity Provider (client: `app-android`, redirect: `https://prod.shv-app.ch/oidc/callback`, scopes: `openid offline_access`).
+   - `https://shv-app-ws-prod.shv-app.ch/v1/wms/person`: Official SHV Member Web Service returning `UserProfile` (`shvNumber`, `firstName`, `lastName`, `address`, `memberships`, `insurance`, `brevets`).
+   - `https://shv-app-ws-prod.shv-app.ch/v1/wms/company`: Fallback SHV Member Web Service for club/school/company profiles.
 
 3. **Core Application Modules**:
    - **Interactive Live Map**: Leaflet map supporting Swisstopo National Map, Swisstopo Satellite (Swissimage), Swisstopo Light Base, and OpenStreetMap. Interactive layers for Launches, Landings, Airspaces, Wildlife zones, Stations, Föhn transects, and Webcams with wind compass roses and bottom sheets.
@@ -52,7 +55,12 @@ A high-performance, responsive web reproduction of the official **SHV FSVL** (Sc
   - Replaced silent `catch (e) {}` blocks across `ShvApi`, `AppState`, `VarioAudio`, and views with informative `console.error` logs.
   - Added in-memory dataset caching in `ShvApi` for `flyingsites`, `airspaces`, and `wildschutz` to eliminate redundant network roundtrips when navigating between views.
 - **Language Dropdown Display State**: The language popup `.lang-menu` was set to `display: flex;` in CSS without a `.lang-menu.hidden` or global `.hidden { display: none !important; }` rule, causing it to render permanently visible over the top-right of the map regardless of whether `.hidden` was present on the element. Added global `.hidden` and `.lang-menu.hidden` rules, plus a document-level outside click dismiss listener.
-- **Zero Fake Data Policy & Authentic Authentication Guard**:
+- **Option A OIDC Copy-Paste Login Flow**:
+  - Implemented the official Keycloak PKCE authorization code flow utilizing the native `app-android` public client.
+  - `/api/auth/start`: Generates `code_verifier`, `code_challenge` (S256), and single-use `state`, returning the official Keycloak authorization URL.
+  - User authenticates directly on `https://login.shv-fsvl.ch` and is redirected to `https://prod.shv-app.ch/oidc/callback?code=...&state=...`.
+  - `/api/auth/exchange`: Accepts the callback URL, verifies state against stored PKCE verifier, exchanges authorization code for JWT tokens at `https://login.shv-fsvl.ch/realms/SHV/protocol/openid-connect/token`, and queries `https://shv-app-ws-prod.shv-app.ch/v1/wms/person` for the pilot's genuine verified profile, Brevets, insurance, and club memberships.
+  - No credentials or passwords ever touch our server or client code; only genuine upstream data is rendered without placeholders.
   - Removed all mock/sample data (fake Marco Odermatt pilot profile, fake flights in logbook, simulated sounding parameters, server fallback stations, and sine wave Föhn trend).
   - Previously, `ProfileView.js` contained a client-side form handler that synthesized a fake pilot profile with dummy ratings (`['Brevet Gleitschirm']`) and fake insurance upon submit, resulting in "rubbish data" being rendered and persisted in `localStorage`.
   - Removed the mock login generator completely. Updated `loadSavedProfile` in `AppState` (`src/state.js`) to automatically purge any legacy dummy profiles (`firstName === 'Pilot'`).

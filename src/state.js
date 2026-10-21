@@ -8,12 +8,14 @@ class AppState {
     const savedLang = localStorage.getItem('shv_lang') || 'de';
     const savedTheme = localStorage.getItem('shv_theme') || 'dark';
     const savedLogs = this.loadSavedLogs();
+    const savedSession = localStorage.getItem('shv_session_id') || null;
     const savedProfile = this.loadSavedProfile();
 
     this.state = {
       activeTab: 'map', // 'map' | 'weather' | 'forecast' | 'safety' | 'profile'
       lang: savedLang,
       theme: savedTheme,
+      sid: savedSession,
       
       // Map configuration
       baseMap: 'topoColor', // 'topoColor' | 'topoSatellite' | 'topoLight' | 'topoOsm'
@@ -88,6 +90,22 @@ class AppState {
     }
   }
 
+  setSession(sid, profile) {
+    this.state.sid = sid;
+    this.state.profile = profile;
+    if (sid) {
+      localStorage.setItem('shv_session_id', sid);
+    } else {
+      localStorage.removeItem('shv_session_id');
+    }
+    if (profile) {
+      localStorage.setItem('shv_profile', JSON.stringify(profile));
+    } else {
+      localStorage.removeItem('shv_profile');
+    }
+    this.notify();
+  }
+
   setProfile(profile) {
     this.state.profile = profile;
     if (profile) {
@@ -99,7 +117,7 @@ class AppState {
   }
 
   logout() {
-    this.setProfile(null);
+    this.setSession(null, null);
   }
 
   subscribe(listener) {

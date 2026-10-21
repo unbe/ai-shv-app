@@ -145,4 +145,51 @@ export class ShvApi {
     }
     return null;
   }
+
+  // --- SHV OIDC Member Authentication (Option A) ---
+
+  static async authStart() {
+    const resp = await fetch('/api/auth/start', { method: 'POST' });
+    if (!resp.ok) {
+      throw new Error(`Fehler beim Starten der Authentifizierung (${resp.status})`);
+    }
+    return await resp.json();
+  }
+
+  static async authExchange(callbackUrl) {
+    const resp = await fetch('/api/auth/exchange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callbackUrl }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.error || `Token-Austausch fehlgeschlagen (${resp.status})`);
+    }
+    return data;
+  }
+
+  static async getAuthProfile(sid) {
+    if (!sid) return null;
+    const resp = await fetch('/api/auth/profile', {
+      headers: { 'X-Session-ID': sid },
+    });
+    if (!resp.ok) {
+      if (resp.status === 401) return null;
+      throw new Error(`Profilabruf fehlgeschlagen (${resp.status})`);
+    }
+    return await resp.json();
+  }
+
+  static async authLogout(sid) {
+    if (!sid) return;
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'X-Session-ID': sid },
+      });
+    } catch (e) {
+      console.warn('[ShvApi.authLogout] Error logging out on server:', e);
+    }
+  }
 }

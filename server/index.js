@@ -4,6 +4,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { startAuth, exchangeCode, getSession, logoutSession } from './auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -277,6 +278,57 @@ app.get('/api/dabs', (req, res) => {
     notesDe: 'Täglich ab 16:00 LT für den Folgetag durch Skybriefing publiziert. Vor jedem Streckenflug obligatorisch zu konsultieren!',
     notesEn: 'Published daily at 16:00 LT for the next day via Skybriefing. Mandatory consultation prior to cross-country flights!'
   });
+});
+
+// 6. SHV Keycloak OIDC Authentication Routes (Option A: Desktop / Web callback paste flow)
+app.post('/api/auth/start', (req, res) => {
+  try {
+    const result = startAuth();
+    res.json(result);
+  } catch (err) {
+    console.error('[Server] /api/auth/start error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/exchange', async (req, res) => {
+  try {
+    const { callbackUrl, code, state } = req.body || {};
+    const result = await exchangeCode({ callbackUrl, code, state });
+    res.json(result);
+  } catch (err) {
+    console.error('[Server] /api/auth/exchange error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/auth/profile', async (req, res) => {
+  try {
+    const sid = req.headers['x-session-id'];
+    if (!sid) {
+      return res.status(401).json({ error: 'Nicht angemeldet (keine Session-ID)' });
+    }
+    const session = await getSession(sid);
+    if (!session) {
+      return res.status(401).json({ error: 'Session abgelaufen oder ungültig' });
+    }
+    res.json(session);
+  } catch (err) {
+    console.error('[Server] /api/auth/profile error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  try {
+    const sid = req.headers['x-session-id'];
+    if (sid) {
+      logoutSession(sid);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {

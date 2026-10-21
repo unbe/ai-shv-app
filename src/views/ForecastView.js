@@ -12,6 +12,50 @@ export class ForecastView {
   unmount() {}
 
   render() {
+    const p = store.state.profile;
+    const sid = store.state.sid;
+
+    if (sid && p) {
+      const fullName = p.firstName && p.lastName
+        ? `${p.firstName} ${p.lastName}`
+        : (p.name || 'SHV Mitglied');
+      const shvId = p.shvNumber || p.shvNummer || p.extId || '–';
+
+      this.container.innerHTML = `
+        <div class="forecast-view-wrapper">
+          <div class="member-blocker-card" style="border-color: rgba(0, 137, 207, 0.4);">
+            <div class="blocker-icon-badge" style="background: rgba(0, 137, 207, 0.12); border-color: rgba(0, 137, 207, 0.3); color: var(--primary-accent);">
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+              </svg>
+            </div>
+            <span class="badge-tag">SHV Flugwetter</span>
+            <h2 class="blocker-title">SHV Meteo Portal</h2>
+            <p class="blocker-text">
+              Angemeldet als <strong>${fullName}</strong> (SHV-Nr. ${shvId}). Die täglichen Segelflug-Wetterberichte, Thermik- und Windprognosen stehen dir im offiziellen SHV-Wetterportal zur Verfügung.
+            </p>
+
+            <div class="blocker-actions-column" style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 380px; margin: 0 auto;">
+              <a href="https://www.shv-fsvl.ch/wetter" target="_blank" rel="noopener" class="btn-primary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 14px 18px; border-radius: 12px; font-weight: 700;">
+                <span>SHV Wetterportal öffnen (shv-fsvl.ch/wetter) ↗</span>
+              </a>
+              <button id="btn-goto-profile" class="btn-secondary" style="padding: 12px 18px; border-radius: 12px; font-weight: 600;">
+                <span>Mein SHV Profil & Lizenzen ansehen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const btnProfile = this.container.querySelector('#btn-goto-profile');
+      if (btnProfile) {
+        btnProfile.addEventListener('click', () => {
+          store.setTab('profile');
+        });
+      }
+      return;
+    }
+
     this.container.innerHTML = `
       <div class="forecast-view-wrapper">
         <div class="member-blocker-card">
@@ -36,15 +80,22 @@ export class ForecastView {
           </div>
 
           <div class="blocker-actions-column" style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 380px; margin: 0 auto;">
-            <a href="https://www.shv-fsvl.ch/wetter" target="_blank" rel="noopener" class="btn-primary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
+            <button id="btn-goto-login-tab" class="btn-primary" style="display: flex; align-items: center; justify-content: center; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
+              <span>Mit SHV-Konto anmelden (im Profil)</span>
+            </button>
+            <a href="https://www.shv-fsvl.ch/wetter" target="_blank" rel="noopener" class="btn-secondary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
               <span>Offizielles SHV Wetterportal öffnen ↗</span>
-            </a>
-            <a href="https://www.shv-fsvl.ch/anmelden/login/" target="_blank" rel="noopener" class="btn-secondary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
-              <span>SHV Web-Login (shv-fsvl.ch) ↗</span>
             </a>
           </div>
         </div>
       </div>
     `;
+
+    const btnLogin = this.container.querySelector('#btn-goto-login-tab');
+    if (btnLogin) {
+      btnLogin.addEventListener('click', () => {
+        store.setTab('profile');
+      });
+    }
   }
 }
