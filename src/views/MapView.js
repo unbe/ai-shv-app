@@ -68,90 +68,182 @@ export class MapView {
 
     this.container.innerHTML = `
       <div class="map-view-wrapper">
-        <!-- Floating Controls Panel -->
-        <div class="map-controls-panel">
-          <!-- Search & Site Filter Bar -->
-          <div class="map-search-row">
-            <div class="search-input-wrapper">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-              <input type="text" id="map-search-input" placeholder="${t.map.searchPlaceholder}" value="${searchQuery}" />
-              ${searchQuery ? `<button id="btn-clear-search" class="clear-btn">&times;</button>` : ''}
+        <!-- 1. Top Search Bar & Active Filter Pills -->
+        <div class="map-top-container">
+          <div class="map-search-wrapper">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="map-search-input" placeholder="${t.map.searchPlaceholder}" value="${searchQuery}" autocomplete="off" />
+            ${searchQuery ? `<button id="btn-clear-search" class="clear-btn" title="Suche löschen">&times;</button>` : ''}
+          </div>
+
+          <!-- Active Filter Indicator Pills -->
+          <div class="active-filter-pills ${windFilter.length > 0 || searchQuery ? '' : 'hidden'}">
+            ${windFilter.length > 0 ? `
+              <div class="active-pill pill-wind">
+                <span>🍃 Wind: ${windFilter.join(', ')}</span>
+                <button id="pill-clear-wind" title="Windfilter entfernen">&times;</button>
+              </div>
+            ` : ''}
+            ${searchQuery ? `
+              <div class="active-pill pill-search">
+                <span>🔍 "${searchQuery}"</span>
+                <button id="pill-clear-search" title="Suche entfernen">&times;</button>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- 2. Right Floating Action Button (FAB) Stack -->
+        <div class="map-fab-column">
+          <!-- Layers & Basemap FAB -->
+          <button id="btn-fab-layers" class="map-fab" title="Ebenen & Basiskarte">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+          </button>
+
+          <!-- Wind Compass Filter FAB -->
+          <button id="btn-fab-wind" class="map-fab ${windFilter.length > 0 ? 'fab-active' : ''}" title="Windfilter">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+            </svg>
+            ${windFilter.length > 0 ? `<span class="fab-badge">${windFilter.length}</span>` : ''}
+          </button>
+
+          <!-- Center Switzerland FAB -->
+          <button id="btn-fab-center" class="map-fab" title="Schweiz zentrieren">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M3 12h3m12 0h3M12 3v3m0 12v3"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- 3. Layers & Basemaps Flyout Drawer -->
+        <div id="map-layers-drawer" class="map-drawer hidden">
+          <div class="drawer-header">
+            <h3>Ebenen & Basiskarte</h3>
+            <button class="drawer-close" id="btn-close-layers">&times;</button>
+          </div>
+          <div class="drawer-body">
+            <!-- Basemap Section -->
+            <div class="drawer-section">
+              <h4 class="drawer-subtitle">Basiskarte</h4>
+              <div class="basemap-grid">
+                <button data-base="topoColor" class="basemap-card ${baseMap === 'topoColor' ? 'active' : ''}">
+                  <img src="/assets/ic_topo_raster.png" alt="Topo" class="basemap-card-img" />
+                  <span>Pixelkarte</span>
+                </button>
+                <button data-base="topoSatellite" class="basemap-card ${baseMap === 'topoSatellite' ? 'active' : ''}">
+                  <img src="/assets/ic_topo_imagery.png" alt="Luftbild" class="basemap-card-img" />
+                  <span>Luftbild</span>
+                </button>
+                <button data-base="topoLight" class="basemap-card ${baseMap === 'topoLight' ? 'active' : ''}">
+                  <img src="/assets/ic_topo_light.png" alt="Grau" class="basemap-card-img" />
+                  <span>Grau</span>
+                </button>
+                <button data-base="topoOsm" class="basemap-card ${baseMap === 'topoOsm' ? 'active' : ''}">
+                  <div class="basemap-osm-placeholder">OSM</div>
+                  <span>OpenStreet</span>
+                </button>
+              </div>
             </div>
 
-            <!-- Base Map Dropdown Button -->
-            <button id="btn-basemap-toggle" class="control-btn" title="${t.map.baseMap}">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                <polyline points="2 17 12 22 22 17"></polyline>
-                <polyline points="2 12 12 17 22 12"></polyline>
-              </svg>
-            </button>
-          </div>
+            <!-- Overlays Section -->
+            <div class="drawer-section">
+              <h4 class="drawer-subtitle">Kartenebenen</h4>
+              <div class="layer-switch-list">
+                <label class="layer-switch-item">
+                  <div class="layer-switch-label">
+                    <span class="chip-dot dot-launch"></span>
+                    <span>Startplätze (Take-offs)</span>
+                  </div>
+                  <input type="checkbox" data-layer="launches" ${layers.launches ? 'checked' : ''} />
+                  <span class="switch-toggle"></span>
+                </label>
 
-          <!-- Base Map Selector Menu -->
-          <div id="basemap-selector" class="basemap-menu hidden">
-            <button data-base="topoColor" class="basemap-item ${baseMap === 'topoColor' ? 'active' : ''}">
-              <img src="/assets/ic_topo_raster.png" alt="Topo" class="basemap-thumb" />
-              <span>${t.map.topoColor}</span>
-            </button>
-            <button data-base="topoSatellite" class="basemap-item ${baseMap === 'topoSatellite' ? 'active' : ''}">
-              <img src="/assets/ic_topo_imagery.png" alt="Satellite" class="basemap-thumb" />
-              <span>${t.map.topoSatellite}</span>
-            </button>
-            <button data-base="topoLight" class="basemap-item ${baseMap === 'topoLight' ? 'active' : ''}">
-              <img src="/assets/ic_topo_light.png" alt="Light" class="basemap-thumb" />
-              <span>${t.map.topoLight}</span>
-            </button>
-            <button data-base="topoOsm" class="basemap-item ${baseMap === 'topoOsm' ? 'active' : ''}">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
-              <span>${t.map.topoOsm}</span>
-            </button>
-          </div>
+                <label class="layer-switch-item">
+                  <div class="layer-switch-label">
+                    <span class="chip-dot dot-landing"></span>
+                    <span>Landeplätze (Landings)</span>
+                  </div>
+                  <input type="checkbox" data-layer="landings" ${layers.landings ? 'checked' : ''} />
+                  <span class="switch-toggle"></span>
+                </label>
 
-          <!-- Wind Rose Filter Chips -->
-          <div class="wind-filter-row">
-            <span class="wind-filter-label">${t.map.filterWindDirections}</span>
-            <div class="wind-chips-list">
+                <label class="layer-switch-item">
+                  <div class="layer-switch-label">
+                    <span class="chip-dot dot-airspace"></span>
+                    <span>Luftraum (CTR, TMA, Segelflug)</span>
+                  </div>
+                  <input type="checkbox" data-layer="airspace" ${layers.airspace ? 'checked' : ''} />
+                  <span class="switch-toggle"></span>
+                </label>
+
+                <label class="layer-switch-item">
+                  <div class="layer-switch-label">
+                    <span class="chip-dot dot-wild"></span>
+                    <span>Wildruhezonen (300m AGL)</span>
+                  </div>
+                  <input type="checkbox" data-layer="wildschutz" ${layers.wildschutz ? 'checked' : ''} />
+                  <span class="switch-toggle"></span>
+                </label>
+
+                <label class="layer-switch-item">
+                  <div class="layer-switch-label">
+                    <span class="chip-dot dot-station"></span>
+                    <span>Wetterstationen & Wind</span>
+                  </div>
+                  <input type="checkbox" data-layer="stations" ${layers.stations ? 'checked' : ''} />
+                  <span class="switch-toggle"></span>
+                </label>
+
+                <label class="layer-switch-item">
+                  <div class="layer-switch-label">
+                    <span class="chip-dot" style="background: #EF4444;"></span>
+                    <span>Föhn-Achse (Gotthard)</span>
+                  </div>
+                  <input type="checkbox" data-layer="foehnAxis" ${layers.foehnAxis ? 'checked' : ''} />
+                  <span class="switch-toggle"></span>
+                </label>
+
+                <label class="layer-switch-item">
+                  <div class="layer-switch-label">
+                    <span class="chip-dot dot-webcam"></span>
+                    <span>Webcams</span>
+                  </div>
+                  <input type="checkbox" data-layer="webcams" ${layers.webcams ? 'checked' : ''} />
+                  <span class="switch-toggle"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Wind Compass Selector Drawer -->
+        <div id="map-wind-drawer" class="map-drawer hidden">
+          <div class="drawer-header">
+            <h3>Startplatz Windfilter</h3>
+            <button class="drawer-close" id="btn-close-wind">&times;</button>
+          </div>
+          <div class="drawer-body">
+            <p class="drawer-hint">Wähle Windrichtungen aus, um nur passende Startplätze zu sehen:</p>
+            <div class="compass-rose-grid">
               ${windDirs.map(d => `
-                <button data-wind="${d}" class="wind-chip ${windFilter.includes(d) ? 'active' : ''}">
+                <button data-wind="${d}" class="compass-btn ${windFilter.includes(d) ? 'active' : ''}">
                   ${d}
                 </button>
               `).join('')}
-              ${windFilter.length > 0 ? `
-                <button id="btn-clear-wind" class="wind-chip-clear" title="Filter zurücksetzen">✕</button>
-              ` : ''}
             </div>
-          </div>
-
-          <!-- Layer Toggle Chips -->
-          <div class="layer-toggle-row">
-            <button data-layer="launches" class="layer-chip ${layers.launches ? 'active' : ''}">
-              <span class="chip-dot dot-launch"></span>
-              <span>${t.map.filterLaunches}</span>
-            </button>
-            <button data-layer="landings" class="layer-chip ${layers.landings ? 'active' : ''}">
-              <span class="chip-dot dot-landing"></span>
-              <span>${t.map.filterLandings}</span>
-            </button>
-            <button data-layer="airspace" class="layer-chip ${layers.airspace ? 'active' : ''}">
-              <span class="chip-dot dot-airspace"></span>
-              <span>${t.map.filterAirspace}</span>
-            </button>
-            <button data-layer="wildschutz" class="layer-chip ${layers.wildschutz ? 'active' : ''}">
-              <span class="chip-dot dot-wild"></span>
-              <span>${t.map.filterWildschutz}</span>
-            </button>
-            <button data-layer="stations" class="layer-chip ${layers.stations ? 'active' : ''}">
-              <span class="chip-dot dot-station"></span>
-              <span>${t.map.filterStations}</span>
-            </button>
-            <button data-layer="webcams" class="layer-chip ${layers.webcams ? 'active' : ''}">
-              <span class="chip-dot dot-webcam"></span>
-              <span>${t.map.filterWebcams}</span>
-            </button>
+            <div id="wind-drawer-reset-wrapper" style="display: ${windFilter.length > 0 ? 'block' : 'none'};" class="text-center mt-3">
+              <button id="btn-reset-wind-filter" class="btn-secondary" style="width: 100%;">Filter zurücksetzen</button>
+            </div>
           </div>
         </div>
 
@@ -179,47 +271,96 @@ export class MapView {
       });
     }
 
-    const basemapToggle = this.container.querySelector('#btn-basemap-toggle');
-    const basemapSelector = this.container.querySelector('#basemap-selector');
-    if (basemapToggle && basemapSelector) {
-      basemapToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        basemapSelector.classList.toggle('hidden');
+    // Active filter pills delegation
+    const pillsContainer = this.container.querySelector('.active-filter-pills');
+    if (pillsContainer) {
+      pillsContainer.addEventListener('click', (e) => {
+        if (e.target.closest('#pill-clear-wind')) {
+          store.clearWindFilter();
+        } else if (e.target.closest('#pill-clear-search')) {
+          store.setSearchQuery('');
+          if (searchInput) searchInput.value = '';
+        }
       });
-
-      basemapSelector.querySelectorAll('.basemap-item').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const baseKey = btn.getAttribute('data-base');
-          store.setBaseMap(baseKey);
-          basemapSelector.classList.add('hidden');
-        });
-      });
-
-      document.addEventListener('click', () => {
-        basemapSelector.classList.add('hidden');
-      }, { once: true });
     }
 
+    // Floating Action Buttons (FABs)
+    const btnFabLayers = this.container.querySelector('#btn-fab-layers');
+    const btnFabWind = this.container.querySelector('#btn-fab-wind');
+    const btnFabCenter = this.container.querySelector('#btn-fab-center');
+    const layersDrawer = this.container.querySelector('#map-layers-drawer');
+    const windDrawer = this.container.querySelector('#map-wind-drawer');
+
+    if (btnFabLayers && layersDrawer) {
+      btnFabLayers.addEventListener('click', (e) => {
+        e.stopPropagation();
+        layersDrawer.classList.toggle('hidden');
+        if (windDrawer) windDrawer.classList.add('hidden');
+      });
+    }
+
+    if (btnFabWind && windDrawer) {
+      btnFabWind.addEventListener('click', (e) => {
+        e.stopPropagation();
+        windDrawer.classList.toggle('hidden');
+        if (layersDrawer) layersDrawer.classList.add('hidden');
+      });
+    }
+
+    const closeLayers = this.container.querySelector('#btn-close-layers');
+    if (closeLayers && layersDrawer) {
+      closeLayers.addEventListener('click', () => layersDrawer.classList.add('hidden'));
+    }
+
+    const closeWind = this.container.querySelector('#btn-close-wind');
+    if (closeWind && windDrawer) {
+      closeWind.addEventListener('click', () => windDrawer.classList.add('hidden'));
+    }
+
+    // Prevent map click when interacting inside drawers
+    if (layersDrawer) layersDrawer.addEventListener('click', (e) => e.stopPropagation());
+    if (windDrawer) windDrawer.addEventListener('click', (e) => e.stopPropagation());
+
+    if (btnFabCenter) {
+      btnFabCenter.addEventListener('click', () => {
+        if (this.map) {
+          this.map.setView([46.8182, 8.2275], 9);
+        }
+      });
+    }
+
+    // Basemap selector items
+    this.container.querySelectorAll('.basemap-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const baseKey = btn.getAttribute('data-base');
+        store.setBaseMap(baseKey);
+        this.container.querySelectorAll('.basemap-card').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // Layer toggle switches
+    this.container.querySelectorAll('input[data-layer]').forEach(input => {
+      input.addEventListener('change', () => {
+        const layerKey = input.getAttribute('data-layer');
+        store.toggleLayer(layerKey);
+      });
+    });
+
     // Wind filter buttons
-    this.container.querySelectorAll('.wind-chip').forEach(btn => {
+    this.container.querySelectorAll('.compass-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const dir = btn.getAttribute('data-wind');
         store.toggleWindFilter(dir);
       });
     });
 
-    const clearWind = this.container.querySelector('#btn-clear-wind');
-    if (clearWind) {
-      clearWind.addEventListener('click', () => store.clearWindFilter());
-    }
-
-    // Layer toggle chips
-    this.container.querySelectorAll('.layer-chip').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const layerKey = btn.getAttribute('data-layer');
-        store.toggleLayer(layerKey);
+    const resetWindBtn = this.container.querySelector('#btn-reset-wind-filter');
+    if (resetWindBtn) {
+      resetWindBtn.addEventListener('click', () => {
+        store.clearWindFilter();
       });
-    });
+    }
   }
 
   initMap() {
@@ -273,8 +414,13 @@ export class MapView {
     if (layers.webcams) this.webcamsLayer.addTo(this.map);
     if (layers.foehnAxis) this.foehnLayer.addTo(this.map);
 
-    // Click outside deselects
+    // Click outside deselects and closes flyout drawers
     this.map.on('click', (e) => {
+      const layersDrawer = this.container.querySelector('#map-layers-drawer');
+      const windDrawer = this.container.querySelector('#map-wind-drawer');
+      if (layersDrawer) layersDrawer.classList.add('hidden');
+      if (windDrawer) windDrawer.classList.add('hidden');
+
       // If clicked on empty space, deselect
       if (!e.originalEvent._shvHandled) {
         store.selectSite(null);
@@ -735,7 +881,10 @@ export class MapView {
     // 3. Re-filter Flying Sites if search or windFilter changed
     this.renderFlyingSites();
 
-    // 4. Pilot Geolocation Marker
+    // 4. Update Filter UI Controls & Pills
+    this.updateFilterUi(state);
+
+    // 5. Pilot Geolocation Marker
     if (state.pilotLocation) {
       const pos = [state.pilotLocation.lat, state.pilotLocation.lng];
       if (!this.pilotMarker) {
@@ -750,6 +899,97 @@ export class MapView {
       } else {
         this.pilotMarker.setLatLng(pos);
       }
+    }
+  }
+
+  updateFilterUi(state) {
+    const { searchQuery, windFilter, layers, baseMap } = state;
+    const searchInput = this.container.querySelector('#map-search-input');
+    if (searchInput && searchInput.value !== (searchQuery || '')) {
+      searchInput.value = searchQuery || '';
+    }
+
+    // Active filter indicator pills
+    const pillsContainer = this.container.querySelector('.active-filter-pills');
+    if (pillsContainer) {
+      const hasPills = (windFilter && windFilter.length > 0) || Boolean(searchQuery);
+      if (!hasPills) {
+        pillsContainer.classList.add('hidden');
+        pillsContainer.innerHTML = '';
+      } else {
+        pillsContainer.classList.remove('hidden');
+        pillsContainer.innerHTML = `
+          ${windFilter && windFilter.length > 0 ? `
+            <div class="active-pill pill-wind">
+              <span>🍃 Wind: ${windFilter.join(', ')}</span>
+              <button id="pill-clear-wind" title="Windfilter entfernen">&times;</button>
+            </div>
+          ` : ''}
+          ${searchQuery ? `
+            <div class="active-pill pill-search">
+              <span>🔍 "${searchQuery}"</span>
+              <button id="pill-clear-search" title="Suche entfernen">&times;</button>
+            </div>
+          ` : ''}
+        `;
+      }
+    }
+
+    // Wind FAB badge & active state
+    const btnFabWind = this.container.querySelector('#btn-fab-wind');
+    if (btnFabWind) {
+      if (windFilter && windFilter.length > 0) {
+        btnFabWind.classList.add('fab-active');
+        let badge = btnFabWind.querySelector('.fab-badge');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'fab-badge';
+          btnFabWind.appendChild(badge);
+        }
+        badge.textContent = windFilter.length;
+      } else {
+        btnFabWind.classList.remove('fab-active');
+        const badge = btnFabWind.querySelector('.fab-badge');
+        if (badge) badge.remove();
+      }
+    }
+
+    // Compass buttons in wind drawer
+    this.container.querySelectorAll('.compass-btn').forEach(btn => {
+      const d = btn.getAttribute('data-wind');
+      if (windFilter && windFilter.includes(d)) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    // Reset button in wind drawer
+    const resetWindWrapper = this.container.querySelector('#wind-drawer-reset-wrapper');
+    if (resetWindWrapper) {
+      resetWindWrapper.style.display = (windFilter && windFilter.length > 0) ? 'block' : 'none';
+    }
+
+    // Layer checkboxes sync
+    if (layers) {
+      this.container.querySelectorAll('input[data-layer]').forEach(input => {
+        const key = input.getAttribute('data-layer');
+        if (typeof layers[key] === 'boolean') {
+          input.checked = layers[key];
+        }
+      });
+    }
+
+    // Basemap cards sync
+    if (baseMap) {
+      this.container.querySelectorAll('.basemap-card').forEach(card => {
+        const key = card.getAttribute('data-base');
+        if (key === baseMap) {
+          card.classList.add('active');
+        } else {
+          card.classList.remove('active');
+        }
+      });
     }
   }
 }
