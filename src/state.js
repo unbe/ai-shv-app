@@ -19,14 +19,15 @@ class AppState {
       
       // Map configuration
       baseMap: 'topoColor', // 'topoColor' | 'topoSatellite' | 'topoLight' | 'topoOsm'
+      meteoMode: 'WIND', // 'WIND' | 'TEMPERATURE' | 'PRESSURE_DIFFERENCE' | 'WEBCAM' | 'NONE'
       layers: {
         launches: true,
         landings: true,
         airspace: true,
         wildschutz: true,
-        stations: false,
+        stations: true,
         webcams: false,
-        foehnAxis: true,
+        foehnAxis: false,
       },
       searchQuery: '',
       windFilter: [], // e.g. ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
@@ -195,6 +196,28 @@ class AppState {
       this.state.layers[layerKey] = !this.state.layers[layerKey];
       this.notify();
     }
+  }
+
+  setMeteoMode(mode) {
+    this.state.meteoMode = mode;
+    if (mode === 'WIND' || mode === 'TEMPERATURE') {
+      this.state.layers.stations = true;
+      this.state.layers.webcams = false;
+      this.state.layers.foehnAxis = false;
+    } else if (mode === 'PRESSURE_DIFFERENCE') {
+      this.state.layers.stations = false;
+      this.state.layers.webcams = false;
+      this.state.layers.foehnAxis = true;
+    } else if (mode === 'WEBCAM') {
+      this.state.layers.stations = false;
+      this.state.layers.webcams = true;
+      this.state.layers.foehnAxis = false;
+    } else if (mode === 'NONE') {
+      this.state.layers.stations = false;
+      this.state.layers.webcams = false;
+      this.state.layers.foehnAxis = false;
+    }
+    this.notify();
   }
 
   setSearchQuery(q) {

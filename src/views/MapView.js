@@ -62,13 +62,13 @@ export class MapView {
 
   renderLayout() {
     const t = store.t;
-    const { layers, baseMap, windFilter, searchQuery } = store.state;
+    const { layers, baseMap, windFilter, searchQuery, meteoMode } = store.state;
 
     const windDirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
     this.container.innerHTML = `
       <div class="map-view-wrapper">
-        <!-- 1. Top Search Bar & Active Filter Pills -->
+        <!-- 1. Top Search Bar & Meteo Mode Selector -->
         <div class="map-top-container">
           <div class="map-search-wrapper">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
@@ -77,6 +77,29 @@ export class MapView {
             </svg>
             <input type="text" id="map-search-input" placeholder="${t.map.searchPlaceholder}" value="${searchQuery}" autocomplete="off" />
             ${searchQuery ? `<button id="btn-clear-search" class="clear-btn" title="Suche löschen">&times;</button>` : ''}
+          </div>
+
+          <!-- Official SHV Live Map Meteo Mode Selector (LiveMapMeteoType) -->
+          <div class="meteo-mode-bar">
+            <button data-meteo-mode="WIND" class="meteo-pill ${meteoMode === 'WIND' ? 'active' : ''}" title="Windwerte & Böen an Stationen">
+              <span class="pill-icon">🍃</span>
+              <span>Wind</span>
+            </button>
+            <button data-meteo-mode="TEMPERATURE" class="meteo-pill ${meteoMode === 'TEMPERATURE' ? 'active' : ''}" title="Temperatur-Overlay an Stationen">
+              <span class="pill-icon">🌡️</span>
+              <span>Temp</span>
+            </button>
+            <button data-meteo-mode="PRESSURE_DIFFERENCE" class="meteo-pill ${meteoMode === 'PRESSURE_DIFFERENCE' ? 'active' : ''}" title="Offizielle Transekte (Gotthard, Genf-Güttingen, Pilatus-Matro, Jura)">
+              <span class="pill-icon">⚡</span>
+              <span>Föhn / Δp</span>
+            </button>
+            <button data-meteo-mode="WEBCAM" class="meteo-pill ${meteoMode === 'WEBCAM' ? 'active' : ''}" title="Alpine Webcams mit Live-Vorschau">
+              <span class="pill-icon">📷</span>
+              <span>Webcams</span>
+            </button>
+            <button data-meteo-mode="NONE" class="meteo-pill ${meteoMode === 'NONE' ? 'active' : ''}" title="Meteo-Ebenen ausblenden">
+              <span>✕</span>
+            </button>
           </div>
 
           <!-- Active Filter Indicator Pills -->
@@ -352,6 +375,14 @@ export class MapView {
       btn.addEventListener('click', () => {
         const dir = btn.getAttribute('data-wind');
         store.toggleWindFilter(dir);
+      });
+    });
+
+    // Meteo mode selector pills
+    this.container.querySelectorAll('.meteo-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-meteo-mode');
+        store.setMeteoMode(mode);
       });
     });
 
@@ -771,93 +802,167 @@ export class MapView {
     this.stationsLayer.clearLayers();
     if (!this.rawMeasurements || !this.rawMeasurements.features) return;
 
+    const isTempMode = store.state.meteoMode === 'TEMPERATURE';
+
     for (const f of this.rawMeasurements.features) {
       const coords = f.geometry?.coordinates;
       const p = f.properties || {};
-      if (!coords || !p.windSpeedValue) continue;
-      if (typeof coords[0] !== 'number' || typeof coords[1] !== 'number' || isNaN(coords[0]) || isNaN(coords[1])) continue;
+      if (!coords || typeof coords[0] !== 'number' || typeof coords[1] !== 'number' || isNaN(coords[0]) || isNaN(coords[1])) continue;
 
       const latLng = [coords[1], coords[0]];
-      const speedKmH = Math.round(p.windSpeedValue * 3.6);
-      const gustKmH = p.windGustValue ? Math.round(p.windGustValue * 3.6) : null;
-      const dirDeg = p.windDirectionValue || 0;
 
-      // Color code by wind speed
-      let speedClass = 'speed-calm';
-      if (speedKmH >= 35) speedClass = 'speed-storm';
-      else if (speedKmH >= 25) speedClass = 'speed-high';
-      else if (speedKmH >= 15) speedClass = 'speed-mod';
+      if (isTempMode) {
+        // Temperature Mode (from WeatherStationProduct / temperature2mValue)
+        const rawT = p.temperature2mValue ?? p.temperatureValue;
+        if (rawT === null || rawT === undefined || isNaN(rawT)) continue;
+        const tempC = rawT > 200 ? Math.round((rawT - 273.15) * 10) / 10 : Math.round(rawT * 10) / 10;
 
-      const iconHtml = `
-        <div class="station-map-pin ${speedClass}" title="${p.name || ''}: ${speedKmH} km/h">
-          <div class="station-arrow" style="transform: rotate(${dirDeg}deg)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2L4 20l8-4 8 4z"/>
-            </svg>
+        let tempColor = '#3B82F6';
+        if (tempC >= 22) tempColor = '#EF4444';
+        else if (tempC >= 15) tempColor = '#F59E0B';
+        else if (tempC >= 8) tempColor = '#10B981';
+        else if (tempC >= 0) tempColor = '#06B6D4';
+
+        const iconHtml = `
+          <div class="station-temp-pin" style="background-color: ${tempColor};" title="${p.name || ''}: ${tempC}°C">
+            <span>${tempC > 0 ? '+' : ''}${tempC}°</span>
           </div>
-          <span class="station-speed">${speedKmH}</span>
-        </div>
-      `;
+        `;
 
-      const icon = L.divIcon({
-        className: 'station-div-icon',
-        html: iconHtml,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-      });
+        const icon = L.divIcon({
+          className: 'station-temp-div-icon',
+          html: iconHtml,
+          iconSize: [36, 22],
+          iconAnchor: [18, 11],
+        });
 
-      const marker = L.marker(latLng, { icon });
-      marker.on('click', (e) => {
-        e.originalEvent._shvHandled = true;
-        store.selectStation(f);
-      });
+        const marker = L.marker(latLng, { icon });
+        marker.on('click', (e) => {
+          e.originalEvent._shvHandled = true;
+          store.selectStation(f);
+        });
+        this.stationsLayer.addLayer(marker);
 
-      this.stationsLayer.addLayer(marker);
+      } else {
+        // Wind Mode (Wind speed & direction arrows)
+        if (!p.windSpeedValue) continue;
+        const speedKmH = Math.round(p.windSpeedValue * 3.6);
+        const dirDeg = p.windDirectionValue || 0;
+
+        let speedClass = 'speed-calm';
+        if (speedKmH >= 35) speedClass = 'speed-storm';
+        else if (speedKmH >= 25) speedClass = 'speed-high';
+        else if (speedKmH >= 15) speedClass = 'speed-mod';
+
+        const iconHtml = `
+          <div class="station-map-pin ${speedClass}" title="${p.name || ''}: ${speedKmH} km/h">
+            <div class="station-arrow" style="transform: rotate(${dirDeg}deg)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L4 20l8-4 8 4z"/>
+              </svg>
+            </div>
+            <span class="station-speed">${speedKmH}</span>
+          </div>
+        `;
+
+        const icon = L.divIcon({
+          className: 'station-div-icon',
+          html: iconHtml,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        });
+
+        const marker = L.marker(latLng, { icon });
+        marker.on('click', (e) => {
+          e.originalEvent._shvHandled = true;
+          store.selectStation(f);
+        });
+        this.stationsLayer.addLayer(marker);
+      }
     }
   }
 
   renderFoehnAxis(foehnData) {
     this.foehnLayer.clearLayers();
-    if (!foehnData || !foehnData.primaryPair) return;
+    if (!foehnData) return;
 
-    // Gotthard axis transect: Kloten (47.48, 8.536) to Lugano (46.0, 8.96)
-    const p1 = [47.48, 8.536]; // Kloten
-    const p2 = [46.0, 8.96];   // Lugano
-    const mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+    // Support all 4 official station pairs (PressureDifferenceGeoJsonTransformer)
+    const pairs = foehnData.pairs || (foehnData.primaryPair ? [foehnData.primaryPair] : []);
+    if (!pairs.length) return;
 
-    const diff = foehnData.primaryPair.diffHpa;
-    const isDanger = foehnData.primaryPair.alertLevel === 'DANGER';
-    const isMod = foehnData.primaryPair.alertLevel === 'MODERATE';
-    const lineColor = isDanger ? '#EF4444' : isMod ? '#F59E0B' : '#10B981';
+    for (const pair of pairs) {
+      const c1 = pair.station1?.coordinates;
+      const c2 = pair.station2?.coordinates;
+      if (!c1 || !c2) continue;
 
-    // Polyline connecting North and South
-    const polyline = L.polyline([p1, p2], {
-      color: lineColor,
-      weight: 3.5,
-      dashArray: '6, 6',
-      opacity: 0.85,
-    });
-    this.foehnLayer.addLayer(polyline);
+      const p1 = [c1[1], c1[0]];
+      const p2 = [c2[1], c2[0]];
+      const midPos = pair.midpointPosition ?? 0.5;
+      const mid = [
+        p1[0] + (p2[0] - p1[0]) * midPos,
+        p1[1] + (p2[1] - p1[1]) * midPos,
+      ];
 
-    // Midpoint delta badge
-    const badgeHtml = `
-      <div class="foehn-map-badge ${isDanger ? 'badge-danger' : isMod ? 'badge-warning' : 'badge-safe'}">
-        <span>Föhn: ${diff > 0 ? '+' : ''}${diff} hPa</span>
-      </div>
-    `;
+      const isDanger = pair.alertLevel === 'DANGER';
+      const isMod = pair.alertLevel === 'MODERATE';
+      const lineColor = isDanger ? '#EF4444' : isMod ? '#F59E0B' : '#0089CF';
 
-    const badgeIcon = L.divIcon({
-      className: 'foehn-badge-icon',
-      html: badgeHtml,
-      iconSize: [110, 26],
-      iconAnchor: [55, 13],
-    });
+      // Transect polyline
+      const polyline = L.polyline([p1, p2], {
+        color: lineColor,
+        weight: 3.5,
+        dashArray: '6, 6',
+        opacity: 0.85,
+      });
+      this.foehnLayer.addLayer(polyline);
 
-    const badgeMarker = L.marker(mid, { icon: badgeIcon });
-    badgeMarker.on('click', () => {
-      store.setTab('weather');
-    });
-    this.foehnLayer.addLayer(badgeMarker);
+      // Station 1 marker dot
+      const dotHtml1 = `
+        <div class="transect-endpoint-dot" title="${pair.station1.name}: ${pair.isPressure ? `${pair.station1.pressureHpa} hPa` : `${pair.station1.temperatureC}°C`}">
+          <span>${pair.station1.name.split(' ')[0]}</span>
+        </div>
+      `;
+      const dot1 = L.marker(p1, {
+        icon: L.divIcon({ className: 'transect-dot-icon', html: dotHtml1, iconSize: [60, 20], iconAnchor: [30, 10] })
+      });
+      this.foehnLayer.addLayer(dot1);
+
+      // Station 2 marker dot
+      const dotHtml2 = `
+        <div class="transect-endpoint-dot" title="${pair.station2.name}: ${pair.isPressure ? `${pair.station2.pressureHpa} hPa` : `${pair.station2.temperatureC}°C`}">
+          <span>${pair.station2.name.split(' ')[0]}</span>
+        </div>
+      `;
+      const dot2 = L.marker(p2, {
+        icon: L.divIcon({ className: 'transect-dot-icon', html: dotHtml2, iconSize: [60, 20], iconAnchor: [30, 10] })
+      });
+      this.foehnLayer.addLayer(dot2);
+
+      // Midpoint badge
+      const deltaVal = pair.delta ?? pair.diffHpa;
+      const deltaStr = deltaVal !== null && deltaVal !== undefined ? `${deltaVal > 0 ? '+' : ''}${deltaVal} ${pair.unit || 'hPa'}` : 'n/a';
+      const badgeClass = isDanger ? 'badge-danger' : isMod ? 'badge-warning' : 'badge-safe';
+
+      const badgeHtml = `
+        <div class="foehn-map-badge ${badgeClass}" title="${pair.nameDe || pair.name}">
+          <span class="foehn-badge-id">${(pair.id || '').replace('_', ' – ')}</span>
+          <span class="foehn-badge-val">Δ: ${deltaStr}</span>
+        </div>
+      `;
+
+      const badgeIcon = L.divIcon({
+        className: 'foehn-badge-icon',
+        html: badgeHtml,
+        iconSize: [120, 36],
+        iconAnchor: [60, 18],
+      });
+
+      const badgeMarker = L.marker(mid, { icon: badgeIcon });
+      badgeMarker.on('click', () => {
+        store.setTab('weather');
+      });
+      this.foehnLayer.addLayer(badgeMarker);
+    }
   }
 
   renderWebcams() {
@@ -921,10 +1026,15 @@ export class MapView {
     updateVisibility(this.webcamsLayer, state.layers.webcams);
     updateVisibility(this.foehnLayer, state.layers.foehnAxis);
 
-    // 3. Re-filter Flying Sites if search or windFilter changed
+    // 3. Re-render Stations according to meteoMode
+    if (state.layers.stations) {
+      this.renderStations();
+    }
+
+    // 4. Re-filter Flying Sites if search or windFilter changed
     this.renderFlyingSites();
 
-    // 4. Update Filter UI Controls & Pills
+    // 5. Update Filter UI Controls & Pills
     this.updateFilterUi(state);
 
     // 5. Pilot Geolocation Marker
@@ -1020,6 +1130,13 @@ export class MapView {
         if (typeof layers[key] === 'boolean') {
           input.checked = layers[key];
         }
+      });
+    }
+
+    // Meteo mode pills sync
+    if (state.meteoMode) {
+      this.container.querySelectorAll('.meteo-pill').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-meteo-mode') === state.meteoMode);
       });
     }
 

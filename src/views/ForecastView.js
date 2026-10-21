@@ -1,101 +1,214 @@
 import { store } from '../state.js';
+import { ShvApi } from '../services/api.js';
 
 export class ForecastView {
   constructor(container) {
     this.container = container;
+    this.forecastData = null;
+    this.activeDay = '0'; // '0' | '1' | '2'
+    this.activeSection = 'text'; // 'text' | 'isobaren' | 'soundings'
+    this.loading = false;
+    this.error = null;
   }
 
-  mount() {
+  async mount() {
+    this.loading = true;
+    this.error = null;
     this.render();
+
+    try {
+      const lang = store.state.lang || 'de';
+      const data = await ShvApi.getTextForecast(lang);
+      if (data && data.forecast) {
+        this.forecastData = data.forecast;
+      } else {
+        throw new Error('Keine Prognosedaten verfügbar');
+      }
+    } catch (err) {
+      console.error('[ForecastView] Error loading text forecast:', err);
+      this.error = 'Flugwetter-Textprognose konnte nicht geladen werden.';
+    } finally {
+      this.loading = false;
+      this.render();
+    }
   }
 
   unmount() {}
 
   render() {
-    const p = store.state.profile;
-    const sid = store.state.sid;
+    const lang = store.state.lang || 'de';
+    const isobarenUrl = ShvApi.getIsobarenSvgUrl(lang);
 
-    if (sid && p) {
-      const fullName = p.firstName && p.lastName
-        ? `${p.firstName} ${p.lastName}`
-        : (p.name || 'SHV Mitglied');
-      const shvId = p.shvNumber || p.shvNummer || p.extId || '–';
+    const issueTimeStr = this.forecastData?.issueTime
+      ? new Date(this.forecastData.issueTime).toLocaleString(lang === 'de' ? 'de-CH' : 'fr-CH', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : null;
 
-      this.container.innerHTML = `
-        <div class="forecast-view-wrapper">
-          <div class="member-blocker-card" style="border-color: rgba(0, 137, 207, 0.4);">
-            <div class="blocker-icon-badge" style="background: rgba(0, 137, 207, 0.12); border-color: rgba(0, 137, 207, 0.3); color: var(--primary-accent);">
-              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
-              </svg>
-            </div>
-            <span class="badge-tag">SHV Flugwetter</span>
-            <h2 class="blocker-title">SHV Meteo Portal</h2>
-            <p class="blocker-text">
-              Angemeldet als <strong>${fullName}</strong> (SHV-Nr. ${shvId}). Die täglichen Segelflug-Wetterberichte, Thermik- und Windprognosen stehen dir im offiziellen SHV-Wetterportal zur Verfügung.
-            </p>
-
-            <div class="blocker-actions-column" style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 380px; margin: 0 auto;">
-              <a href="https://www.shv-fsvl.ch/wetter" target="_blank" rel="noopener" class="btn-primary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 14px 18px; border-radius: 12px; font-weight: 700;">
-                <span>SHV Wetterportal öffnen (shv-fsvl.ch/wetter) ↗</span>
-              </a>
-              <button id="btn-goto-profile" class="btn-secondary" style="padding: 12px 18px; border-radius: 12px; font-weight: 600;">
-                <span>Mein SHV Profil & Lizenzen ansehen</span>
-              </button>
-            </div>
-          </div>
+    let dayContentHtml = '';
+    if (this.forecastData?.text && this.forecastData.text[this.activeDay]) {
+      const rawHtml = this.forecastData.text[this.activeDay];
+      // Extract content from body
+      const bodyMatch = rawHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+      const innerContent = bodyMatch ? bodyMatch[1] : rawHtml;
+      dayContentHtml = `
+        <div class="prognosis-text-body">
+          ${innerContent}
         </div>
       `;
-
-      const btnProfile = this.container.querySelector('#btn-goto-profile');
-      if (btnProfile) {
-        btnProfile.addEventListener('click', () => {
-          store.setTab('profile');
-        });
-      }
-      return;
     }
+
+    const dayLabels = {
+      de: { '0': 'Heute', '1': 'Morgen', '2': 'Übermorgen' },
+      fr: { '0': "Aujourd'hui", '1': 'Demain', '2': 'Après-demain' },
+      it: { '0': 'Oggi', '1': 'Domani', '2': 'Dopodomani' },
+    }[lang] || { '0': 'Heute', '1': 'Morgen', '2': 'Übermorgen' };
 
     this.container.innerHTML = `
       <div class="forecast-view-wrapper">
-        <div class="member-blocker-card">
-          <div class="blocker-icon-badge">
-            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-            </svg>
-          </div>
-          <span class="badge-tag">SHV FSVL Flugwetter & Previtemps</span>
-          <h2 class="blocker-title">Nur für Mitglieder</h2>
-          <p class="blocker-text">
-            Dieser Inhalt ist aktiven SHV-Mitgliedern vorbehalten. Die täglichen Segelflug-Wetterberichte, Thermikprognosen, Höhenwinde und Previtemps-Soundings erfordern einen Login mit deinem SHV-Mitgliedskonto auf dem offiziellen Verbandsportal.
-          </p>
-
-          <div class="auth-notice-box" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin: 18px 0; text-align: left; font-size: 0.88rem; line-height: 1.45; color: var(--text-muted);">
-            <div style="font-weight: 600; color: var(--text-main); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              Keine Beispieldaten
-            </div>
-            Die detaillierten Flugwetterberichte werden von autorisierten SHV-Meteo-Diensten bereitgestellt. Ohne verifizierten SHV-Login werden hier keine simulierten oder fiktiven Prognosen angezeigt.
-          </div>
-
-          <div class="blocker-actions-column" style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 380px; margin: 0 auto;">
-            <button id="btn-goto-login-tab" class="btn-primary" style="display: flex; align-items: center; justify-content: center; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
-              <span>Mit SHV-Konto anmelden (im Profil)</span>
+        <!-- Top Navigation Segmented Bar -->
+        <div class="forecast-top-bar">
+          <div class="forecast-section-switcher">
+            <button data-section="text" class="forecast-tab-btn ${this.activeSection === 'text' ? 'active' : ''}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              <span>Textprognose</span>
             </button>
-            <a href="https://www.shv-fsvl.ch/wetter" target="_blank" rel="noopener" class="btn-secondary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
-              <span>Offizielles SHV Wetterportal öffnen ↗</span>
-            </a>
+            <button data-section="isobaren" class="forecast-tab-btn ${this.activeSection === 'isobaren' ? 'active' : ''}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              </svg>
+              <span>Isobarenkarte</span>
+            </button>
+            <button data-section="soundings" class="forecast-tab-btn ${this.activeSection === 'soundings' ? 'active' : ''}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18"></path>
+                <path d="m19 9-5 5-4-4-3 3"></path>
+              </svg>
+              <span>Soundings & Previtemps</span>
+            </button>
           </div>
         </div>
+
+        <!-- Section 1: Official Text Forecast -->
+        ${this.activeSection === 'text' ? `
+          <div class="forecast-content-card">
+            <div class="section-header-row">
+              <div>
+                <span class="badge-tag">MeteoSchweiz & SHV</span>
+                <h2 class="section-heading">Alpines Flugwetter</h2>
+                ${issueTimeStr ? `<p class="section-sub">Ausgabe: ${issueTimeStr}</p>` : ''}
+              </div>
+            </div>
+
+            <!-- Day Tabs -->
+            <div class="day-pills-row">
+              <button data-day="0" class="day-pill ${this.activeDay === '0' ? 'active' : ''}">${dayLabels['0']}</button>
+              <button data-day="1" class="day-pill ${this.activeDay === '1' ? 'active' : ''}">${dayLabels['1']}</button>
+              <button data-day="2" class="day-pill ${this.activeDay === '2' ? 'active' : ''}">${dayLabels['2']}</button>
+            </div>
+
+            ${this.loading ? `
+              <div class="loading-spinner">
+                <div class="spinner"></div>
+                <span>Prognose wird geladen...</span>
+              </div>
+            ` : this.error ? `
+              <div class="error-notice">${this.error}</div>
+            ` : `
+              <div class="forecast-prognosis-container">
+                ${dayContentHtml}
+              </div>
+            `}
+          </div>
+        ` : ''}
+
+        <!-- Section 2: Synoptic Isobar Chart -->
+        ${this.activeSection === 'isobaren' ? `
+          <div class="forecast-content-card">
+            <div class="section-header-row">
+              <div>
+                <span class="badge-tag">Synoptik</span>
+                <h2 class="section-heading">Offizielle Isobarenkarte</h2>
+                <p class="section-sub">Bodennahres Druckfeld & Frontenverlauf über Mitteleuropa</p>
+              </div>
+              <a href="${isobarenUrl}" target="_blank" rel="noopener" class="btn-secondary" style="font-size: 0.8rem; padding: 6px 12px; text-decoration: none;">
+                Vollbild ↗
+              </a>
+            </div>
+
+            <div class="isobaren-container">
+              <img src="${isobarenUrl}" alt="Offizielle Isobarenkarte" class="isobaren-svg" loading="lazy" />
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Section 3: Soundings & Previtemps -->
+        ${this.activeSection === 'soundings' ? `
+          <div class="forecast-content-card">
+            <div class="section-header-row">
+              <div>
+                <span class="badge-tag">Previtemps</span>
+                <h2 class="section-heading">Radiosondierungen & Thermikprognosen</h2>
+                <p class="section-sub">Payerne, Stuttgart, Mailand & alpine Vertikalprofile</p>
+              </div>
+            </div>
+
+            <div class="sounding-portal-box">
+              <div class="portal-info-banner">
+                <div class="info-icon">📈</div>
+                <div class="info-text">
+                  <strong>Previtemps & Sounding-Diagramme</strong>
+                  <p>
+                    Die hochauflösenden Emagramme und Vertikalschnitte von MeteoSchweiz für Payerne (00Z & 12Z) sowie ICON-D2-Soundings stehen allen lizenzierten SHV-Piloten im Verbandsportal zur Verfügung.
+                  </p>
+                </div>
+              </div>
+
+              <div class="soundings-links-grid">
+                <a href="https://www.shv-fsvl.ch/wetter" target="_blank" rel="noopener" class="sounding-card-link">
+                  <span class="card-link-title">SHV Meteo Portal ↗</span>
+                  <span class="card-link-sub">Offizielle Flugwetterberichte, Windgramme & Thermik</span>
+                </a>
+                <a href="https://www.meteoschweiz.admin.ch/home/wetter/messwerte/radiosondierungen.html" target="_blank" rel="noopener" class="sounding-card-link">
+                  <span class="card-link-title">Radiosondierung Payerne (MeteoSchweiz) ↗</span>
+                  <span class="card-link-sub">Tägliche 00Z & 12Z Ballonaufstiege</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        ` : ''}
       </div>
     `;
 
-    const btnLogin = this.container.querySelector('#btn-goto-login-tab');
-    if (btnLogin) {
-      btnLogin.addEventListener('click', () => {
-        store.setTab('profile');
+    this.attachEvents();
+  }
+
+  attachEvents() {
+    // Section Switcher
+    this.container.querySelectorAll('.forecast-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.activeSection = btn.getAttribute('data-section');
+        this.render();
       });
-    }
+    });
+
+    // Day Pills Switcher
+    this.container.querySelectorAll('.day-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.activeDay = btn.getAttribute('data-day');
+        this.render();
+      });
+    });
   }
 }

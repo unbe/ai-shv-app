@@ -106,6 +106,33 @@ export class ShvApi {
     return null;
   }
 
+  static async getTextForecast(lang = 'de') {
+    try {
+      const resp = await fetch(`/api/meteo/text-forecast/${lang}`);
+      if (resp.ok) return await resp.json();
+      console.error('[ShvApi.getTextForecast] HTTP error:', resp.status, resp.statusText);
+    } catch (e) {
+      console.error('[ShvApi.getTextForecast] Network error:', e);
+    }
+    return null;
+  }
+
+  static getIsobarenSvgUrl(lang = 'de') {
+    return `/api/meteo/isobaren/${lang}`;
+  }
+
+  static async getStationTimeseries(stationId) {
+    if (!stationId) return null;
+    try {
+      const resp = await fetch(`/api/measurements/timeseries/${encodeURIComponent(stationId)}`);
+      if (resp.ok) return await resp.json();
+      console.error('[ShvApi.getStationTimeseries] HTTP error:', resp.status, resp.statusText);
+    } catch (e) {
+      console.error('[ShvApi.getStationTimeseries] Network error:', e);
+    }
+    return null;
+  }
+
   static async getEmagramSounding() {
     try {
       const resp = await fetch('/api/emagram/sounding');

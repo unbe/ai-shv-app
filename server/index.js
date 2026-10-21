@@ -20,6 +20,9 @@ app.use(express.json());
 const cache = {
   measurements: { data: null, timestamp: 0, ttl: 60 * 1000 },
   webcams: { data: null, timestamp: 0, ttl: 120 * 1000 },
+  textForecast: {},
+  isobarenSvg: {},
+  timeseries: {},
 };
 
 // Real historical measurements buffer for Gotthard pressure difference
@@ -85,10 +88,9 @@ app.get('/api/webcams', async (req, res) => {
   }
 });
 
-// 3. Föhn & Pressure Differences (Druckdifferenz Nord-Süd)
+// 3. Föhn & Official Station Difference Pairs (Pressure & Temperature Transects)
 app.get('/api/foehn', async (req, res) => {
   try {
-    // Fetch latest measurements
     let measurements = cache.measurements.data;
     if (!measurements) {
       const mResp = await fetch('http://127.0.0.1:' + PORT + '/api/measurements');
@@ -96,109 +98,263 @@ app.get('/api/foehn', async (req, res) => {
     }
 
     const stations = (measurements && measurements.features) || [];
-    const findStation = (idSubstr) => {
-      return stations.find(f => {
-        const id = f.properties?.stationIdentifier || f.id || '';
-        return id.toLowerCase().includes(idSubstr.toLowerCase());
-      });
+    const getStation = (id) => stations.find(f => f.id === id);
+
+    const extractPressureHpa = (st) => {
+      if (!st || !st.properties) return null;
+      const p = st.properties;
+      const val = p.pressureMslValue ?? p.pressureStandardMslValue ?? p.pressureSurfaceValue;
+      if (val === null || val === undefined || isNaN(val)) return null;
+      return val > 5000 ? Math.round((val / 10.0) * 10) / 10 : Math.round(val * 10) / 10;
     };
 
-    // Key Alpine Transects
-    // 1. Kloten (KLO) vs Lugano (LUG) -> Classic Gotthard Transect
-    const stKloten = findStation('KLO') || { properties: { name: 'Zürich / Kloten', altitude: 426, pressureStandardMslValue: 10185 } };
-    const stLugano = findStation('LUG') || { properties: { name: 'Lugano', altitude: 273, pressureStandardMslValue: 10212 } };
-
-    // 2. Gütsch (GUT, alpine pass 2287m) vs Altdorf (ALT)
-    const stGuetsch = findStation('GUT') || { properties: { name: 'Gütsch ob Andermatt', altitude: 2287, pressureStandardMslValue: 10170 } };
-    const stAltdorf = findStation('ALT') || { properties: { name: 'Altdorf', altitude: 438, pressureStandardMslValue: 10182 } };
-
-    // Extract pressures in hPa (values are stored in 0.1 hPa or standard hPa)
-    const getPressure = (st) => {
-      const val = st?.properties?.pressureStandardMslValue;
-      if (!val) return 1015.0;
-      return val > 5000 ? val / 10.0 : val;
+    const extractTempC = (st) => {
+      if (!st || !st.properties) return null;
+      const p = st.properties;
+      const val = p.temperature2mValue ?? p.temperatureValue;
+      if (val === null || val === undefined || isNaN(val)) return null;
+      // Convert Kelvin to Celsius if > 200
+      const celsius = val > 200 ? val - 273.15 : val;
+      return Math.round(celsius * 10) / 10;
     };
 
-    const pKloten = getPressure(stKloten);
-    const pLugano = getPressure(stLugano);
-    const pGuetsch = getPressure(stGuetsch);
-    const pAltdorf = getPressure(stAltdorf);
+    // Official 4 station pairs from decompiled APK (PressureDifferenceGeoJsonTransformer.c)
+    const pairConfigs = [
+      {
+        id: 'KLO_LUG',
+        type: 'PRESSURE_NORTH_SOUTH',
+        isPressure: true,
+        isNorthSouth: true,
+        midpointPosition: 0.25,
+        startId: 'meteo_swiss:KLO',
+        endId: 'meteo_swiss:LUG',
+        nameDe: 'Gotthard-Achse (Zürich/Kloten – Lugano)',
+        nameEn: 'Gotthard Axis (Zurich/Kloten – Lugano)',
+        unit: 'hPa',
+      },
+      {
+        id: 'GVE_GUT',
+        type: 'PRESSURE_EAST_WEST',
+        isPressure: true,
+        isNorthSouth: false,
+        midpointPosition: 0.5,
+        startId: 'meteo_swiss:GVE',
+        endId: 'meteo_swiss:GUT',
+        nameDe: 'Ost-West Gradient / Bise (Genf – Güttingen)',
+        nameEn: 'East-West Gradient / Bise (Geneva – Guettingen)',
+        unit: 'hPa',
+      },
+      {
+        id: 'PIL_MTR',
+        type: 'TEMPERATURE_NORTH_SOUTH',
+        isPressure: false,
+        isNorthSouth: true,
+        midpointPosition: 0.4,
+        startId: 'meteo_swiss:PIL',
+        endId: 'meteo_swiss:MTR',
+        nameDe: 'Alpenkamm Temperatur (Pilatus 2105m – Matro 2171m)',
+        nameEn: 'Alpine Crest Temperature (Pilatus – Matro)',
+        unit: '°C',
+      },
+      {
+        id: 'DEM_GRE',
+        type: 'PRESSURE_NORTH_SOUTH',
+        isPressure: true,
+        isNorthSouth: true,
+        midpointPosition: 0.5,
+        startId: 'meteo_swiss:DEM',
+        endId: 'meteo_swiss:GRE',
+        nameDe: 'Jura-Querung (Delémont – Grenchen)',
+        nameEn: 'Jura Transect (Delemont – Grenchen)',
+        unit: 'hPa',
+      },
+    ];
 
-    // Delta: Lugano (South) - Kloten (North)
-    // Positive delta = South Föhn (Südföhn)
-    // Negative delta = North Föhn (Nordföhn)
-    const diffGotthard = Math.round((pLugano - pKloten) * 10) / 10;
-    const diffAltdorf = Math.round((pLugano - pAltdorf) * 10) / 10;
+    const pairs = [];
+    const geoJsonFeatures = [];
 
-    let status = 'CALM'; // normal
-    let alertLevel = 'NONE'; // NONE, MODERATE, DANGER
-    let descriptionDe = 'Keine wesentliche Föhndifferenz (< 4 hPa). Sichere Flugbedingungen.';
-    let descriptionEn = 'No significant Föhn pressure gradient (< 4 hPa). Safe flight conditions.';
+    for (const cfg of pairConfigs) {
+      const st1 = getStation(cfg.startId);
+      const st2 = getStation(cfg.endId);
 
-    if (diffGotthard >= 8.0) {
-      status = 'SEVERE_SOUTH_FOEHN';
-      alertLevel = 'DANGER';
-      descriptionDe = `Starker Südföhn (+${diffGotthard} hPa)! Akute Lebensgefahr für Hängegleiter in den Alpentälern (starke Rotoren, Sturmböen). Flugverbot beachten!`;
-      descriptionEn = `Severe South Föhn (+${diffGotthard} hPa)! Extreme hazard for free-flight pilots in alpine valleys (severe rotors, storm gusts). Do not fly!`;
-    } else if (diffGotthard >= 4.0) {
-      status = 'MODERATE_SOUTH_FOEHN';
-      alertLevel = 'MODERATE';
-      descriptionDe = `Mässiger Südföhn (+${diffGotthard} hPa). Zunehmende Turbulenz und Durchgreifgefahr in den Föhntälern. Grosse Vorsicht geboten!`;
-      descriptionEn = `Moderate South Föhn (+${diffGotthard} hPa). Increasing turbulence and risk of Föhn penetration in valleys. Extreme caution advised!`;
-    } else if (diffGotthard <= -8.0) {
-      status = 'SEVERE_NORTH_FOEHN';
-      alertLevel = 'DANGER';
-      descriptionDe = `Starker Nordföhn (${diffGotthard} hPa)! Starke Fallwinde und Rotoren auf der Alpensüdseite (Tessin). Flugbetrieb einstellen!`;
-      descriptionEn = `Severe North Föhn (${diffGotthard} hPa)! Strong downdrafts and rotors on the southern Alps. Suspend flying!`;
-    } else if (diffGotthard <= -4.0) {
-      status = 'MODERATE_NORTH_FOEHN';
-      alertLevel = 'MODERATE';
-      descriptionDe = `Mässiger Nordföhn (${diffGotthard} hPa). Turbulente Bedingungen im Tessin und Südtälern.`;
-      descriptionEn = `Moderate North Föhn (${diffGotthard} hPa). Turbulent conditions in Ticino and southern valleys.`;
+      if (!st1 || !st2) continue;
+
+      const p1 = extractPressureHpa(st1);
+      const p2 = extractPressureHpa(st2);
+      const t1 = extractTempC(st1);
+      const t2 = extractTempC(st2);
+
+      const coord1 = st1.geometry?.coordinates;
+      const coord2 = st2.geometry?.coordinates;
+
+      let delta = null;
+      if (cfg.isPressure) {
+        if (p1 !== null && p2 !== null) {
+          // For Gotthard & DEM_GRE: South minus North
+          // For GVE_GUT: West minus East
+          delta = (cfg.id === 'GVE_GUT')
+            ? Math.round((p1 - p2) * 10) / 10
+            : Math.round((p2 - p1) * 10) / 10;
+        }
+      } else {
+        if (t1 !== null && t2 !== null) {
+          delta = Math.round((t1 - t2) * 10) / 10;
+        }
+      }
+
+      // Status and safety assessment
+      let status = 'CALM';
+      let alertLevel = 'NONE';
+      let descriptionDe = 'Normale Druckverhältnisse. Sichere Bedingungen.';
+      let descriptionEn = 'Normal pressure conditions. Safe flying conditions.';
+
+      if (cfg.id === 'KLO_LUG' && delta !== null) {
+        if (delta >= 8.0) {
+          status = 'SEVERE_SOUTH_FOEHN';
+          alertLevel = 'DANGER';
+          descriptionDe = `Starker Südföhn (+${delta} hPa)! Akute Lebensgefahr in den Föhntälern (starke Rotoren, schwere Sturmböen). Flugbetrieb einstellen!`;
+          descriptionEn = `Severe South Foehn (+${delta} hPa)! Extreme hazard in alpine valleys (severe rotors, storm gusts). Cease flying!`;
+        } else if (delta >= 4.0) {
+          status = 'MODERATE_SOUTH_FOEHN';
+          alertLevel = 'MODERATE';
+          descriptionDe = `Mässiger Südföhn (+${delta} hPa). Zunehmende Turbulenz und Gefahr des Föhndurchbruchs in den Alpentälern.`;
+          descriptionEn = `Moderate South Foehn (+${delta} hPa). Increasing turbulence and risk of Foehn breakthrough in valleys.`;
+        } else if (delta <= -8.0) {
+          status = 'SEVERE_NORTH_FOEHN';
+          alertLevel = 'DANGER';
+          descriptionDe = `Starker Nordföhn (${delta} hPa)! Gefährliche Turbulenzen und Lee-Rotoren auf der Alpensüdseite (Tessin).`;
+          descriptionEn = `Severe North Foehn (${delta} hPa)! Dangerous turbulence and lee-wave rotors on the south side of the Alps.`;
+        } else if (delta <= -4.0) {
+          status = 'MODERATE_NORTH_FOEHN';
+          alertLevel = 'MODERATE';
+          descriptionDe = `Mässiger Nordföhn (${delta} hPa). Böig und turbulent im Tessin.`;
+          descriptionEn = `Moderate North Foehn (${delta} hPa). Gusty and turbulent in Ticino.`;
+        }
+      } else if (cfg.isPressure && delta !== null) {
+        if (Math.abs(delta) >= 6.0) {
+          alertLevel = 'DANGER';
+          descriptionDe = `Starker Druckgradient (${delta > 0 ? '+' : ''}${delta} hPa). Starkwind und Turbulenzen im Transect.`;
+        } else if (Math.abs(delta) >= 3.0) {
+          alertLevel = 'MODERATE';
+          descriptionDe = `Mässiger Gradient (${delta > 0 ? '+' : ''}${delta} hPa). Merkliche Ausgleichsströmung.`;
+        }
+      }
+
+      const pairObj = {
+        id: cfg.id,
+        type: cfg.type,
+        isPressure: cfg.isPressure,
+        isNorthSouth: cfg.isNorthSouth,
+        nameDe: cfg.nameDe,
+        nameEn: cfg.nameEn,
+        unit: cfg.unit,
+        delta,
+        status,
+        alertLevel,
+        descriptionDe,
+        descriptionEn,
+        station1: {
+          id: st1.id,
+          name: st1.properties.name,
+          altitude: st1.properties.altitude,
+          pressureHpa: p1,
+          temperatureC: t1,
+          coordinates: coord1,
+        },
+        station2: {
+          id: st2.id,
+          name: st2.properties.name,
+          altitude: st2.properties.altitude,
+          pressureHpa: p2,
+          temperatureC: t2,
+          coordinates: coord2,
+        },
+        midpointPosition: cfg.midpointPosition,
+      };
+
+      pairs.push(pairObj);
+
+      // Construct GeoJSON representations matching PressureDifferenceGeoJsonTransformer
+      if (coord1 && coord2) {
+        const midLon = coord1[0] + (coord2[0] - coord1[0]) * cfg.midpointPosition;
+        const midLat = coord1[1] + (coord2[1] - coord1[1]) * cfg.midpointPosition;
+
+        // Line connecting both stations
+        geoJsonFeatures.push({
+          type: 'Feature',
+          id: `${cfg.id}_line`,
+          geometry: {
+            type: 'LineString',
+            coordinates: [coord1, coord2],
+          },
+          properties: {
+            pairId: cfg.id,
+            isPressure: cfg.isPressure,
+            isNorthSouth: cfg.isNorthSouth,
+            delta,
+            unit: cfg.unit,
+            alertLevel,
+          },
+        });
+
+        // Midpoint badge feature
+        geoJsonFeatures.push({
+          type: 'Feature',
+          id: `${cfg.id}_midpoint`,
+          geometry: {
+            type: 'Point',
+            coordinates: [midLon, midLat],
+          },
+          properties: {
+            pairId: cfg.id,
+            nameDe: cfg.nameDe,
+            delta,
+            unit: cfg.unit,
+            alertLevel,
+            status,
+            station1_name: st1.properties.name,
+            station2_name: st2.properties.name,
+          },
+        });
+      }
     }
 
-    // Record genuine real observation into historical buffer (no synthesized fake sine wave)
+    // Historical Buffer for Gotthard transect
+    const gotthardPair = pairs.find(p => p.id === 'KLO_LUG');
+    const diffGotthard = gotthardPair ? gotthardPair.delta : 0;
+
     const nowTs = Date.now();
     const lastSample = foehnRealHistory[foehnRealHistory.length - 1];
     if (!lastSample || nowTs - lastSample.timestamp >= 5 * 60 * 1000) {
       const nowD = new Date();
       const timeStr = `${nowD.getHours().toString().padStart(2, '0')}:${nowD.getMinutes().toString().padStart(2, '0')}`;
       foehnRealHistory.push({ time: timeStr, diffHpa: diffGotthard, timestamp: nowTs });
-      // Keep up to 24 hours of real readings
       while (foehnRealHistory.length > 0 && nowTs - foehnRealHistory[0].timestamp > 24 * 3600 * 1000) {
         foehnRealHistory.shift();
       }
-    } else {
-      // Update most recent sample with latest precision
+    } else if (diffGotthard !== null) {
       lastSample.diffHpa = diffGotthard;
     }
 
     const history = foehnRealHistory.map(h => ({ time: h.time, diffHpa: h.diffHpa }));
 
     return res.json({
-      primaryPair: {
-        id: 'LUG-KLO',
-        name: 'Lugano - Zürich/Kloten (Gotthard)',
-        northStation: { name: stKloten.properties.name, pressureHpa: pKloten },
-        southStation: { name: stLugano.properties.name, pressureHpa: pLugano },
-        diffHpa: diffGotthard,
-        status,
-        alertLevel,
-        descriptionDe,
-        descriptionEn,
+      primaryPair: gotthardPair ? {
+        id: gotthardPair.id,
+        name: gotthardPair.nameDe,
+        northStation: { name: gotthardPair.station1.name, pressureHpa: gotthardPair.station1.pressureHpa },
+        southStation: { name: gotthardPair.station2.name, pressureHpa: gotthardPair.station2.pressureHpa },
+        diffHpa: gotthardPair.delta,
+        status: gotthardPair.status,
+        alertLevel: gotthardPair.alertLevel,
+        descriptionDe: gotthardPair.descriptionDe,
+        descriptionEn: gotthardPair.descriptionEn,
+      } : null,
+      pairs,
+      geoJson: {
+        type: 'FeatureCollection',
+        features: geoJsonFeatures,
       },
-      secondaryPairs: [
-        {
-          id: 'LUG-ALT',
-          name: 'Lugano - Altdorf (Reusstal)',
-          diffHpa: diffAltdorf,
-        },
-        {
-          id: 'GUT-KLO',
-          name: 'Gütsch - Zürich (Passhöhe)',
-          diffHpa: Math.round((pGuetsch - pKloten) * 10) / 10,
-        },
-      ],
       history,
       thresholds: {
         moderateThresholdHpa: 4.0,
@@ -212,7 +368,107 @@ app.get('/api/foehn', async (req, res) => {
   }
 });
 
-// 4. Aerological Soundings / Emagram Calculation via Python
+// 4. Official SHV Text Forecast Proxy (Daily Regional Prognoses)
+app.get('/api/meteo/text-forecast/:lang', async (req, res) => {
+  const lang = (req.params.lang || 'de').toLowerCase();
+  const validLang = ['de', 'fr', 'it'].includes(lang) ? lang : 'de';
+  const now = Date.now();
+
+  if (cache.textForecast[validLang] && (now - cache.textForecast[validLang].timestamp < 15 * 60 * 1000)) {
+    return res.json(cache.textForecast[validLang].data);
+  }
+
+  try {
+    const url = `https://shv-app-ws-prod.shv-app.ch/v1/text/forecast/${validLang}.json`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (resp.ok) {
+      const data = await resp.json();
+      cache.textForecast[validLang] = { data, timestamp: now };
+      return res.json(data);
+    }
+    throw new Error(`Upstream text forecast returned ${resp.status}`);
+  } catch (err) {
+    console.error(`[Server] Text forecast error (${validLang}):`, err.message);
+    if (cache.textForecast[validLang]?.data) {
+      return res.json(cache.textForecast[validLang].data);
+    }
+    return res.status(503).json({ error: 'Textprognose vorübergehend nicht erreichbar' });
+  }
+});
+
+// 5. Official SHV Isobar Weather Chart Proxy (SVG)
+app.get('/api/meteo/isobaren/:lang', async (req, res) => {
+  const lang = (req.params.lang || 'de').toLowerCase();
+  const validLang = ['de', 'fr', 'it'].includes(lang) ? lang : 'de';
+  const now = Date.now();
+
+  if (cache.isobarenSvg[validLang] && (now - cache.isobarenSvg[validLang].timestamp < 15 * 60 * 1000)) {
+    res.setHeader('Content-Type', 'image/svg+xml;charset=utf-8');
+    return res.send(cache.isobarenSvg[validLang].data);
+  }
+
+  try {
+    const url = `https://shv-app-ws-prod.shv-app.ch/v1/text/isobaren/${validLang}.svg`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (resp.ok) {
+      const svgText = await resp.text();
+      cache.isobarenSvg[validLang] = { data: svgText, timestamp: now };
+      res.setHeader('Content-Type', 'image/svg+xml;charset=utf-8');
+      return res.send(svgText);
+    }
+    throw new Error(`Upstream isobaren returned ${resp.status}`);
+  } catch (err) {
+    console.error(`[Server] Isobaren error (${validLang}):`, err.message);
+    if (cache.isobarenSvg[validLang]?.data) {
+      res.setHeader('Content-Type', 'image/svg+xml;charset=utf-8');
+      return res.send(cache.isobarenSvg[validLang].data);
+    }
+    return res.status(503).json({ error: 'Isobarenkarte vorübergehend nicht erreichbar' });
+  }
+});
+
+// 6. Station Timeseries Proxy (Wind, Gusts, Temp, Pressure)
+app.get('/api/measurements/timeseries/:id', async (req, res) => {
+  const stationId = req.params.id;
+  if (!stationId) return res.status(400).json({ error: 'Missing station identifier' });
+
+  const now = Date.now();
+  if (cache.timeseries[stationId] && (now - cache.timeseries[stationId].timestamp < 2 * 60 * 1000)) {
+    return res.json(cache.timeseries[stationId].data);
+  }
+
+  try {
+    const params = 'wind_speed,wind_direction,wind_gust,temperature,pressure_msl,relative_humidity';
+    const url = `https://weather-ws-prod.ubmeteo.io/v1/measurements/timeseries/${encodeURIComponent(stationId)}?parameters=${params}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (resp.ok) {
+      const data = await resp.json();
+      cache.timeseries[stationId] = { data, timestamp: now };
+      return res.json(data);
+    }
+    throw new Error(`Upstream timeseries returned ${resp.status}`);
+  } catch (err) {
+    console.error(`[Server] Timeseries error (${stationId}):`, err.message);
+    if (cache.timeseries[stationId]?.data) {
+      return res.json(cache.timeseries[stationId].data);
+    }
+    return res.status(503).json({ error: 'Stations-Zeitreihe vorübergehend nicht erreichbar' });
+  }
+});
+
+// 7. Aerological Soundings / Emagram Calculation via Python
 app.post('/api/emagram/calculate', (req, res) => {
   const pythonScript = path.join(__dirname, 'emagram_calc.py');
   const py = spawn('python3', [pythonScript]);

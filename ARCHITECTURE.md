@@ -212,16 +212,42 @@ The app integrates live telemetry and static GIS layers across Switzerland:
 ### Spatial Geometries & Centroid Calculation
 While launch sites are usually `Point` features, landing zones, airfield traffic circuits, and launch areas in `flyingsites.geojson` are often formatted as `Polygon`, `MultiPolygon`, or `LineString` geometries. To prevent Leaflet projection crashes (`TypeError: Cannot read properties of null (reading 'lat')`), the application computes the geometric centroid across polygon coordinate rings before placing map markers.
 
-### Alpine Föhn Transect Calculation
-The Gotthard barometric pressure gradient is computed in real time from live automated weather stations:
-- **South Station**: Lugano (`LUG`, 273m AMSL)
-- **North Station**: Zurich / Kloten (`KLO`, 426m AMSL)
-- **Calculation**: $\Delta p = p_{\text{Lugano}} - p_{\text{Kloten}}$ (reduced to sea level QNH).
-  - $\Delta p \ge +4.0\text{ hPa}$: Moderate South Föhn (*Mässiger Südföhn*)
-  - $\Delta p \ge +8.0\text{ hPa}$: Severe South Föhn (*Starker Südföhn – Lebensgefahr*)
-  - $\Delta p \le -4.0\text{ hPa}$: Moderate North Föhn (*Mässiger Nordföhn / Tessin*)
-  - $\Delta p \le -8.0\text{ hPa}$: Severe North Föhn (*Starker Nordföhn*)
-- **Secondary Pairs**: Lugano vs. Altdorf (`ALT`, Reusstal) and Gütsch ob Andermatt (`GUT`, 2287m AMSL pass).
+### Alpine Pressure & Temperature Difference Transects
+The native app computes exactly four official station pairs across Switzerland (`PressureDifferenceGeoJsonTransformer.c`):
+1. **Gotthard Föhn Axis (`KLO_LUG`)** – `PRESSURE_NORTH_SOUTH` (midpoint 0.25):
+   - **North**: Zürich / Kloten (`meteo_swiss:KLO`, 426m AMSL)
+   - **South**: Lugano (`meteo_swiss:LUG`, 273m AMSL)
+   - **Calculation**: $\Delta p = p_{\text{Lugano}} - p_{\text{Kloten}}$ (reduced to sea level QNH).
+     - $\Delta p \ge +4.0\text{ hPa}$: Moderate South Föhn (*Mässiger Südföhn*)
+     - $\Delta p \ge +8.0\text{ hPa}$: Severe South Föhn (*Starker Südföhn – Lebensgefahr*)
+     - $\Delta p \le -4.0\text{ hPa}$: Moderate North Föhn (*Mässiger Nordföhn / Tessin*)
+     - $\Delta p \le -8.0\text{ hPa}$: Severe North Föhn (*Starker Nordföhn*)
+2. **East-West Pressure Gradient (`GVE_GUT`)** – `PRESSURE_EAST_WEST` (midpoint 0.5):
+   - **West**: Geneva / Cointrin (`meteo_swiss:GVE`, 411m AMSL)
+   - **East**: Güttingen / Gütsch (`meteo_swiss:GUT`, 440m AMSL)
+   - **Calculation**: $\Delta p = p_{\text{Geneva}} - p_{\text{Güttingen}}$ (Bise / Westwind gradient indicator).
+3. **Alpine Crest Temperature Transect (`PIL_MTR`)** – `TEMPERATURE_NORTH_SOUTH` (midpoint 0.4):
+   - **North**: Pilatus (`meteo_swiss:PIL`, 2105m AMSL)
+   - **South**: Matro (`meteo_swiss:MTR`, 2171m AMSL)
+   - **Calculation**: $\Delta T = T_{\text{Pilatus}} - T_{\text{Matro}}$ in °C (thermal inversion / alpine ridge stability).
+4. **Jura Transect (`DEM_GRE`)** – `PRESSURE_NORTH_SOUTH` (midpoint 0.5):
+   - **North**: Delémont (`meteo_swiss:DEM`, 439m AMSL)
+   - **South**: Grenchen (`meteo_swiss:GRE`, 428m AMSL)
+   - **Calculation**: $\Delta p = p_{\text{Grenchen}} - p_{\text{Delémont}}$ in hPa (cross-Jura pressure gradient).
+
+### Live Map Meteo Modes (`LiveMapMeteoType`)
+The official application organizes real-time meteo into 5 distinct modes (`LiveMapMeteoType`):
+- `WIND`: Displays station wind vectors with direction arrows, speed, and gust tags colored by wind intensity.
+- `TEMPERATURE`: Displays thermal gradient overlay with temperature badges (°C) mapped to cold-to-hot chromatic palettes.
+- `PRESSURE_DIFFERENCE`: Renders the 4 official transect vectors across Switzerland with dynamic $\Delta p$ / $\Delta T$ mid-point badges.
+- `WEBCAM`: Displays alpine live webcams from `webcam-prod.ubmeteo.io/v1/webcams/overview` with high-resolution imagery and timelapses.
+- `NONE`: Meteo overlay deactivated.
+
+### Text Forecasts & Synoptic Weather Charts
+The application integrates official MeteoSchweiz and SHV daily text prognoses directly from Verband infrastructure:
+- **Text Forecasts**: `https://shv-app-ws-prod.shv-app.ch/v1/text/forecast/{lang}.json` (3-day regional outlook for Deutschschweiz, Romandie, and Ticino in DE, FR, IT).
+- **Isobar Charts**: `https://shv-app-ws-prod.shv-app.ch/v1/text/isobaren/{lang}.svg` (Synoptic European surface pressure field and fronts).
+- **Timeseries Telemetry**: `https://weather-ws-prod.ubmeteo.io/v1/measurements/timeseries/{stationId}?parameters=...` (24-hour recorded historical telemetry).
 
 ---
 
