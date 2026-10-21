@@ -35,17 +35,17 @@ export function renderProfileView(container) {
           </div>
 
           <div class="blocker-actions-column" style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 380px; margin: 0 auto;">
-            <a href="https://login.shv-fsvl.ch/realms/SHV/account/" target="_blank" rel="noopener" class="btn-primary btn-login-submit" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
-              <span>Offizielles SHV Login (login.shv-fsvl.ch) ↗</span>
+            <a href="https://login.shv-fsvl.ch/realms/SHV/protocol/openid-connect/auth?scope=openid&response_type=code&approval_prompt=auto&redirect_uri=https%3A%2F%2Fwww.shv-fsvl.ch%2Ftypo3conf%2Fext%2Foidc%2FResources%2FPublic%2Fcallback.php&client_id=typo3" target="_blank" rel="noopener" class="btn-primary btn-login-submit" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
+              <span>Offizielles SHV Keycloak Login ↗</span>
             </a>
-            <a href="https://www.shv-fsvl.ch/verband/mitgliedschaft/" target="_blank" rel="noopener" class="btn-secondary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
-              <span>Mitgliedschaft beim SHV beantragen ↗</span>
+            <a href="https://www.shv-fsvl.ch/" target="_blank" rel="noopener" class="btn-secondary" style="display: flex; align-items: center; justify-content: center; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600;">
+              <span>SHV Verbandsportal (shv-fsvl.ch) ↗</span>
             </a>
           </div>
 
           <div class="login-links-row" style="margin-top: 20px; display: flex; justify-content: center; gap: 20px; font-size: 0.85rem;">
             <a href="https://login.shv-fsvl.ch/realms/SHV/login-actions/reset-credentials" target="_blank" rel="noopener" style="color: var(--primary-accent); text-decoration: none;">Passwort vergessen? ↗</a>
-            <a href="https://www.shv-fsvl.ch" target="_blank" rel="noopener" style="color: var(--primary-accent); text-decoration: none;">SHV FSVL Website ↗</a>
+            <a href="https://admin.webmembership.ch/shv/pages/public/registration.jsf" target="_blank" rel="noopener" style="color: var(--primary-accent); text-decoration: none;">Mitglied werden ↗</a>
           </div>
         </div>
       </div>
