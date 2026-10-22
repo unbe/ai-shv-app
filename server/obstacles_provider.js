@@ -145,10 +145,11 @@ export async function queryObstacles({ minLon, minLat, maxLon, maxLat, zoom = 12
 
   const z = parseFloat(zoom) || 12;
   const isDetail = z >= 13;       // Red dot endpoints along cables
-  const isMedium = z >= 8;        // Masts, cranes, trees, windmills, buildings
-  const isRegional = z >= 6;      // Lines and polygons
+  const isLocal = z >= 12;        // Local flight sites
+  const isRegional = z >= 10;     // Regional view
+  const isOverview = z >= 8;      // Country overview
 
-  if (!isRegional) {
+  if (z < 7) {
     return { type: 'FeatureCollection', features: [] };
   }
 
@@ -156,6 +157,10 @@ export async function queryObstacles({ minLon, minLat, maxLon, maxLat, zoom = 12
   const gx1 = Math.floor(maxLon * 10);
   const gy0 = Math.floor(minLat * 10);
   const gy1 = Math.floor(maxLat * 10);
+
+  const numCells = Math.max(1, (gx1 - gx0 + 1) * (gy1 - gy0 + 1));
+  // Distribute quota evenly across all spatial cells so West doesn't starve East
+  const maxPerCell = Math.max(250, Math.ceil(3500 / numCells));
 
   const seen = new Set();
   const matched = [];
@@ -165,10 +170,12 @@ export async function queryObstacles({ minLon, minLat, maxLon, maxLat, zoom = 12
       const cell = spatialGrid.get(`${gx}_${gy}`);
       if (!cell) continue;
 
+      let cellCount = 0;
       for (let i = 0; i < cell.length; i++) {
+        if (cellCount >= maxPerCell) break;
+
         const f = cell[i];
         if (seen.has(f._uid)) continue;
-        seen.add(f._uid);
 
         const [bMinX, bMinY, bMaxX, bMaxY] = f._bbox;
         // Bounding box intersection check
@@ -179,29 +186,31 @@ export async function queryObstacles({ minLon, minLat, maxLon, maxLat, zoom = 12
         const geomType = f.geometry?.type;
         const props = f.properties || {};
 
-        // Zoom LOD rules derived from Android APK style.json:
+        // Multi-level zoom LOD filtering derived from Android APK style.json:
         if (geomType === 'Point') {
           const isEndpoint = ['TRANSMISSION_LINE', 'CABLE_CAR', 'CATENARY', 'BRIDGE'].includes(props.obstacleType);
           if (isEndpoint) {
-            if (!isDetail) continue; // Pylon endpoints only at z >= 13
+            if (!isDetail) continue; // Cable pylon endpoint dots only at zoom >= 13
           } else {
-            if (!isMedium) continue; // Structural symbols minzoom 8
-            if (props.small === true && z < 11) continue;
+            if (z < 9 && (props.maxHeightAgl < 80 && props.lighting === 'NONE')) continue;
+            if (z < 11 && (props.maxHeightAgl < 35 && props.lighting === 'NONE')) continue;
+            if (z < 12 && (props.small && props.lighting === 'NONE')) continue;
           }
         } else if (geomType === 'LineString' || geomType === 'Polygon') {
-          if (props.small === true && props.obstacleType !== 'TRANSMISSION_LINE' && z < 10) {
-            continue;
+          if (z < 9) {
+            if (props.maxHeightAgl < 60 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
+          } else if (z < 11) {
+            if (props.maxHeightAgl < 30 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
+          } else if (z < 12) {
+            if (props.small && props.maxHeightAgl < 20 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
           }
         }
 
+        seen.add(f._uid);
         matched.push(f);
-
-        // Safety limit per viewport
-        if (matched.length >= 2500) break;
+        cellCount++;
       }
-      if (matched.length >= 2500) break;
     }
-    if (matched.length >= 2500) break;
   }
 
   return {

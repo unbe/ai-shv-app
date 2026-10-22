@@ -826,6 +826,12 @@ export class MapView {
     const bounds = this.map.getBounds();
     const zoom = this.map.getZoom();
 
+    // At broad national scale (z < 10), clear obstacles to keep base map uncluttered
+    if (zoom < 10) {
+      this.obstaclesLayer.clearLayers();
+      return;
+    }
+
     const minLon = bounds.getWest() - 0.02;
     const maxLon = bounds.getEast() + 0.02;
     const minLat = bounds.getSouth() - 0.01;

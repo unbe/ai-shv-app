@@ -11,7 +11,7 @@ export class ForecastView {
 
     // 1. Text Forecast State
     this.textForecastData = null;
-    this.activeTextCategory = 'regional'; // 'regional' | 'gleitschirm' | 'segelflug' | 'general'
+    this.activeTextCategory = 'weather_report'; // 'weather_report' | 'gleitschirm' | 'segelflug' | 'general'
     this.activeRegion = '0'; // '0': Deutschschweiz & Graubünden, '1': Alpensüdseite & Engadin, '2': Westschweiz & Wallis
 
     // 2. Outlooks ("Aussichten") State
@@ -233,20 +233,18 @@ export class ForecastView {
     let categoryTitle = '';
     let issueTimeStr = '';
 
-    if (this.activeTextCategory === 'regional') {
-      categoryTitle = 'Regionalprognose (MeteoSchweiz / SHV)';
-      const regionalObj = tf.forecast && tf.forecast[this.activeRegion];
-      if (regionalObj) {
-        issueTimeStr = regionalObj.issueTime ? new Date(regionalObj.issueTime).toLocaleString('de-CH') : '';
-        const days = regionalObj.days || [];
-        contentHtml = days.map(day => `
+    if (this.activeTextCategory === 'weather_report' || this.activeTextCategory === 'regional') {
+      categoryTitle = 'Wetterbericht Schweiz (MeteoSchweiz)';
+      const rawHtml = tf.forecast?.text?.[this.activeRegion] || '';
+      issueTimeStr = tf.forecast?.issueTime ? new Date(tf.forecast.issueTime).toLocaleString('de-CH') : '';
+      if (rawHtml) {
+        contentHtml = `
           <div class="text-forecast-day-card">
-            <h4 class="forecast-day-heading">${day.title || day.day || 'Tagesabschnitt'}</h4>
-            <div class="forecast-day-body">${this.sanitizeHtml(day.forecast || day.text || '')}</div>
+            <div class="forecast-day-body">${this.sanitizeHtml(rawHtml)}</div>
           </div>
-        `).join('');
+        `;
       } else {
-        contentHtml = '<p class="text-muted">Keine Regionalprognose für diesen Sektor vorhanden.</p>';
+        contentHtml = '<p class="text-muted">Kein Wetterbericht für diesen Sektor vorhanden.</p>';
       }
     } else if (this.activeTextCategory === 'gleitschirm') {
       categoryTitle = 'Gleitschirmprognose & Thermikbriefing';
@@ -291,10 +289,10 @@ export class ForecastView {
 
     return `
       <div class="forecast-content-card">
-        <!-- Sub-Navigation for Forecast Types -->
+        <!-- Sub-Navigation for Forecast Types (Matching Android 4 Products) -->
         <div class="text-category-switcher-row">
-          <button data-cat="regional" class="category-pill ${this.activeTextCategory === 'regional' ? 'active' : ''}">
-            🏔️ Regional
+          <button data-cat="weather_report" class="category-pill ${this.activeTextCategory === 'weather_report' || this.activeTextCategory === 'regional' ? 'active' : ''}">
+            🇨🇭 Wetterbericht
           </button>
           <button data-cat="gleitschirm" class="category-pill ${this.activeTextCategory === 'gleitschirm' ? 'active' : ''}">
             🪂 Gleitschirm
@@ -315,7 +313,7 @@ export class ForecastView {
           </div>
         </div>
 
-        ${this.activeTextCategory === 'regional' ? `
+        ${(this.activeTextCategory === 'weather_report' || this.activeTextCategory === 'regional') ? `
           <div class="region-pills-row">
             <button data-region="0" class="region-pill ${this.activeRegion === '0' ? 'active' : ''}">${regionLabels['0']}</button>
             <button data-region="1" class="region-pill ${this.activeRegion === '1' ? 'active' : ''}">${regionLabels['1']}</button>
@@ -744,83 +742,9 @@ export class ForecastView {
       `;
     }).join('');
 
-    // Sounding curves: Temperature colored by lapse rate & Dew Point dashed line
-    let tempSegmentsSvg = '';
-    let dewPathPoints = [];
-    let windPoints = [];
-    let windBarbsSvg = '';
-
-    for (let i = 0; i < levels.length; i++) {
-      const lvl = levels[i];
-      const y = pToY(lvl.pressHpa);
-      const xT = tToX(lvl.tempC, y);
-      const xTd = tToX(lvl.dewC, y);
-
-      dewPathPoints.push(`${xTd.toFixed(1)},${y.toFixed(1)}`);
-
-      // Temperature curve segments
-      if (i > 0) {
-        const prevLvl = levels[i - 1];
-        const prevY = pToY(prevLvl.pressHpa);
-        const prevXT = tToX(prevLvl.tempC, prevY);
-
-        // Lapse rate color coding matching Android screenshot scale:
-        // Yellow (>= 0.0) | Light Green (-0.3 to 0.0) | Green (-0.6 to -0.3) | Cyan/Blue (-0.8 to -0.6) | Red (-1.0 to -0.8) | Purple (< -1.0)
-        let strokeColor = '#22C55E';
-        const gamma = lvl.lapseRate;
-        if (gamma >= 0.0) {
-          strokeColor = '#EAB308'; // Inversion (Yellow)
-        } else if (gamma >= -0.3) {
-          strokeColor = '#84CC16'; // Weak lapse (Light green)
-        } else if (gamma >= -0.6) {
-          strokeColor = '#22C55E'; // Normal lapse / good thermals (Green)
-        } else if (gamma >= -0.8) {
-          strokeColor = '#0EA5E9'; // Moderate instability (Blue)
-        } else if (gamma >= -1.0) {
-          strokeColor = '#EF4444'; // Strong thermals (Red)
-        } else {
-          strokeColor = '#A855F7'; // Superadiabatic (Purple)
-        }
-
-        tempSegmentsSvg += `
-          <line 
-            x1="${prevXT.toFixed(1)}" y1="${prevY.toFixed(1)}" 
-            x2="${xT.toFixed(1)}" y2="${y.toFixed(1)}" 
-            stroke="${strokeColor}" 
-            stroke-width="3.6" 
-            stroke-linecap="round" 
-          />
-        `;
-      }
-
-      // Wind curve points: speed range 0 to 45 km/h
-      const windX = (padL + plotW + 20) + Math.min(1, Math.max(0, lvl.speedKmH / 45)) * 75;
-      windPoints.push(`${windX.toFixed(1)},${y.toFixed(1)}`);
-
-      // Draw wind barbs every ~3rd level or ~400m
-      if (i % 3 === 0 || i === levels.length - 1) {
-        const barbX = padL + plotW + 12;
-        const barbY = y;
-        const speed = lvl.speedKmH;
-        const dir = lvl.dirDeg;
-        
-        // Aviation wind barb line with arrow head
-        const len = 16;
-        const rad = (dir - 90) * (Math.PI / 180);
-        const bx2 = barbX + Math.cos(rad) * len;
-        const by2 = barbY + Math.sin(rad) * len;
-
-        windBarbsSvg += `
-          <g transform="translate(${barbX}, ${barbY})" title="${speed} km/h aus ${dir}°">
-            <circle cx="0" cy="0" r="2.5" fill="#0284C7" />
-            <line x1="0" y1="0" x2="${(Math.cos(rad) * len).toFixed(1)}" y2="${(Math.sin(rad) * len).toFixed(1)}" stroke="#0284C7" stroke-width="1.8" />
-          </g>
-        `;
-      }
-    }
-
-    const dewPolyline = dewPathPoints.join(' ');
-    const windPolyline = windPoints.join(' ');
+    // Compute sounding curves via helper method
+    const { dewPolyline, tempSegmentsSvg, windPolyline, windBarbsSvg } = this.computeSoundingCurves(levels);
+    const cursorPct = totalSteps > 1 ? (this.activeEmagramTimeIndex / (totalSteps - 1)) * 100 : 0;
 
     return `
       <div class="emagram-android-frame">
@@ -877,37 +801,35 @@ export class ForecastView {
             <line x1="${padL + plotW}" y1="${padT}" x2="${padL + plotW}" y2="${padT + plotH}" stroke="var(--border-color, #CBD5E1)" stroke-width="1.5" />
 
             <!-- Dewpoint Curve (Dashed Blue) -->
-            ${dewPolyline ? `
-              <polyline 
-                points="${dewPolyline}" 
-                fill="none" 
-                stroke="#0284C7" 
-                stroke-width="2.2" 
-                stroke-dasharray="4,4" 
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            ` : ''}
+            <polyline 
+              id="emagram-dew-polyline"
+              points="${dewPolyline}" 
+              fill="none" 
+              stroke="#0284C7" 
+              stroke-width="2.2" 
+              stroke-dasharray="4,4" 
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
 
             <!-- Temperature Curve (Lapse-Rate Colored Segments) -->
-            <g class="temp-curve-layer">
+            <g id="emagram-temp-segments" class="temp-curve-layer">
               ${tempSegmentsSvg}
             </g>
 
             <!-- Wind Speed Profile Curve (Solid Blue) -->
-            ${windPolyline ? `
-              <polyline 
-                points="${windPolyline}" 
-                fill="none" 
-                stroke="#0284C7" 
-                stroke-width="2.2" 
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            ` : ''}
+            <polyline 
+              id="emagram-wind-polyline"
+              points="${windPolyline}" 
+              fill="none" 
+              stroke="#0284C7" 
+              stroke-width="2.2" 
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
 
             <!-- Wind Barbs -->
-            <g class="wind-barbs-layer">
+            <g id="emagram-wind-barbs" class="wind-barbs-layer">
               ${windBarbsSvg}
             </g>
 
@@ -938,12 +860,38 @@ export class ForecastView {
           <div class="emagram-lapse-unit">°C / 100 m</div>
         </div>
 
-        <!-- Bottom Timeline Slider Panel -->
+        <!-- Bottom Timeline Slider Panel with Fluid Time Ruler Scale -->
         <div class="emagram-timeline-panel">
-          <div class="emagram-timeline-controls">
-            <button id="emagram-prev-btn" class="emagram-stepper-btn" title="Vorherige Stunde">
-              &lt;&lt;
-            </button>
+          <div class="emagram-timeline-track">
+            <div class="emagram-slider-inner-container">
+              <svg class="emagram-ruler-svg" viewBox="0 0 1000 48" preserveAspectRatio="none">
+                ${this.renderTimelineRulerSvg(timeSteps)}
+              </svg>
+              <div id="emagram-cursor-indicator" class="emagram-cursor-indicator" style="left: ${cursorPct}%;">
+                <div class="emagram-cursor-line"></div>
+                <div class="emagram-cursor-dot"></div>
+              </div>
+              <input 
+                type="range" 
+                id="emagram-time-slider" 
+                class="emagram-time-slider" 
+                min="0" 
+                max="${Math.max(0, totalSteps - 1)}" 
+                value="${this.activeEmagramTimeIndex}" 
+                step="1" 
+                aria-label="Zeitstrahl"
+              />
+            </div>
+          </div>
+
+          <div class="emagram-timeline-bottom-row">
+            <button id="emagram-prev-btn" class="emagram-stepper-btn" title="Vorherige Stunde">&lt;&lt;</button>
+            <div class="emagram-date-and-step">
+              <span id="emagram-date-label" class="emagram-date-label">${dateLabel}</span>
+              <span id="emagram-step-label" class="emagram-step-label">
+                Prognoseschritt ${this.activeEmagramTimeIndex + 1} / ${totalSteps}
+              </span>
+            </div>
             <button id="emagram-play-btn" class="player-btn primary ${this.isPlayingEmagram ? 'playing' : ''}" style="width:34px; height:34px;" title="Abspielen">
               ${this.isPlayingEmagram ? `
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -956,30 +904,227 @@ export class ForecastView {
                 </svg>
               `}
             </button>
-            <button id="emagram-next-btn" class="emagram-stepper-btn" title="Nächste Stunde">
-              &gt;&gt;
-            </button>
-            
-            <input 
-              type="range" 
-              id="emagram-time-slider" 
-              class="emagram-time-slider" 
-              min="0" 
-              max="${Math.max(0, totalSteps - 1)}" 
-              value="${this.activeEmagramTimeIndex}" 
-              step="1" 
-            />
-          </div>
-
-          <div class="emagram-timeline-bottom-row">
-            <span class="emagram-date-label">${dateLabel}</span>
-            <span style="font-size:0.8rem; font-weight:700; color:var(--shv-blue);">
-              Prognoseschritt ${this.activeEmagramTimeIndex + 1} / ${totalSteps}
-            </span>
+            <button id="emagram-next-btn" class="emagram-stepper-btn" title="Nächste Stunde">&gt;&gt;</button>
           </div>
         </div>
       </div>
     `;
+  }
+
+  renderTimelineRulerSvg(timeSteps) {
+    if (!timeSteps || !timeSteps.length) return '';
+    const totalSteps = timeSteps.length;
+    const tStart = timeSteps[0].timestamp;
+    const tEnd = timeSteps[totalSteps - 1].timestamp;
+    const totalDurationMs = Math.max(1, tEnd - tStart);
+
+    let elementsSvg = '';
+
+    // Continuous horizontal baseline
+    elementsSvg += `<line x1="0" y1="34" x2="1000" y2="34" stroke="var(--border-color, #CBD5E1)" stroke-width="1.5" />`;
+
+    for (let i = 0; i < totalSteps; i++) {
+      const step = timeSteps[i];
+      const x = ((step.timestamp - tStart) / totalDurationMs) * 1000;
+      const d = new Date(step.timestamp);
+      const hour = d.getHours();
+
+      // Major tick & label every 2 hours
+      const isMajor = (hour % 2 === 0);
+
+      if (isMajor) {
+        elementsSvg += `
+          <text x="${x.toFixed(1)}" y="12" font-size="10.5" font-weight="700" fill="var(--text-muted, #64748B)" text-anchor="middle">
+            ${String(hour).padStart(2, '0')}:00
+          </text>
+          <line x1="${x.toFixed(1)}" y1="18" x2="${x.toFixed(1)}" y2="34" stroke="var(--border-color, #94A3B8)" stroke-width="1.6" />
+        `;
+      } else {
+        // Minor 1-hour tick
+        elementsSvg += `
+          <line x1="${x.toFixed(1)}" y1="23" x2="${x.toFixed(1)}" y2="34" stroke="var(--border-color, #CBD5E1)" stroke-width="1.2" />
+        `;
+      }
+
+      // 30-min intermediate tick mark
+      if (i < totalSteps - 1) {
+        const midX = ((step.timestamp + 1800000 - tStart) / totalDurationMs) * 1000;
+        elementsSvg += `
+          <line x1="${midX.toFixed(1)}" y1="27" x2="${midX.toFixed(1)}" y2="34" stroke="var(--border-color, #E2E8F0)" stroke-width="1" />
+        `;
+      }
+    }
+
+    // "JETZT" (Current wall-clock time) indicator
+    const now = Date.now();
+    if (now >= tStart && now <= tEnd) {
+      const nowX = ((now - tStart) / totalDurationMs) * 1000;
+      elementsSvg += `
+        <line x1="${nowX.toFixed(1)}" y1="2" x2="${nowX.toFixed(1)}" y2="44" stroke="#64748B" stroke-width="1.5" stroke-dasharray="3,3" />
+        <text x="${nowX.toFixed(1)}" y="44" font-size="8.5" font-weight="800" fill="#64748B" text-anchor="middle">JETZT</text>
+      `;
+    }
+
+    return elementsSvg;
+  }
+
+  computeSoundingCurves(levels) {
+    if (!levels || !levels.length) {
+      return { dewPolyline: '', tempSegmentsSvg: '', windPolyline: '', windBarbsSvg: '' };
+    }
+
+    const padL = 46;
+    const padT = 32;
+    const padB = 60;
+    const svgH = 620;
+    const plotW = 340;
+    const plotH = svgH - padT - padB;
+
+    const pMin = 600;
+    const pMax = 1000;
+    const pToY = (p) => {
+      const clampedP = Math.max(pMin, Math.min(pMax, p));
+      return (padT + plotH) - (Math.log(pMax / clampedP) / Math.log(pMax / pMin)) * plotH;
+    };
+
+    const tMin = -15;
+    const tMax = 35;
+    const skewFactor = 0.32;
+    const tToX = (t, y) => {
+      const baseX = padL + ((t - tMin) / (tMax - tMin)) * plotW;
+      const skewX = ((padT + plotH) - y) * skewFactor;
+      return baseX + skewX;
+    };
+
+    let tempSegmentsSvg = '';
+    let dewPathPoints = [];
+    let windPoints = [];
+    let windBarbsSvg = '';
+
+    for (let i = 0; i < levels.length; i++) {
+      const lvl = levels[i];
+      const y = pToY(lvl.pressHpa);
+      const xT = tToX(lvl.tempC, y);
+      const xTd = tToX(lvl.dewC, y);
+
+      dewPathPoints.push(`${xTd.toFixed(1)},${y.toFixed(1)}`);
+
+      if (i > 0) {
+        const prevLvl = levels[i - 1];
+        const prevY = pToY(prevLvl.pressHpa);
+        const prevXT = tToX(prevLvl.tempC, prevY);
+
+        let strokeColor = '#22C55E';
+        const gamma = lvl.lapseRate;
+        if (gamma >= 0.0) {
+          strokeColor = '#EAB308';
+        } else if (gamma >= -0.3) {
+          strokeColor = '#84CC16';
+        } else if (gamma >= -0.6) {
+          strokeColor = '#22C55E';
+        } else if (gamma >= -0.8) {
+          strokeColor = '#0EA5E9';
+        } else if (gamma >= -1.0) {
+          strokeColor = '#EF4444';
+        } else {
+          strokeColor = '#A855F7';
+        }
+
+        tempSegmentsSvg += `
+          <line 
+            x1="${prevXT.toFixed(1)}" y1="${prevY.toFixed(1)}" 
+            x2="${xT.toFixed(1)}" y2="${y.toFixed(1)}" 
+            stroke="${strokeColor}" 
+            stroke-width="3.6" 
+            stroke-linecap="round" 
+          />
+        `;
+      }
+
+      const windX = (padL + plotW + 20) + Math.min(1, Math.max(0, lvl.speedKmH / 45)) * 75;
+      windPoints.push(`${windX.toFixed(1)},${y.toFixed(1)}`);
+
+      if (i % 3 === 0 || i === levels.length - 1) {
+        const barbX = padL + plotW + 12;
+        const barbY = y;
+        const speed = lvl.speedKmH;
+        const dir = lvl.dirDeg;
+        
+        const len = 16;
+        const rad = (dir - 90) * (Math.PI / 180);
+
+        windBarbsSvg += `
+          <g transform="translate(${barbX}, ${barbY})" title="${speed} km/h aus ${dir}°">
+            <circle cx="0" cy="0" r="2.5" fill="#0284C7" />
+            <line x1="0" y1="0" x2="${(Math.cos(rad) * len).toFixed(1)}" y2="${(Math.sin(rad) * len).toFixed(1)}" stroke="#0284C7" stroke-width="1.8" />
+          </g>
+        `;
+      }
+    }
+
+    return {
+      dewPolyline: dewPathPoints.join(' '),
+      windPolyline: windPoints.join(' '),
+      tempSegmentsSvg,
+      windBarbsSvg,
+    };
+  }
+
+  updateEmagramTimeStepDOM(newIndex) {
+    const timeSteps = this.emagramForecastData?.timeSteps || [];
+    const totalSteps = timeSteps.length;
+    if (!totalSteps) return;
+
+    this.activeEmagramTimeIndex = Math.max(0, Math.min(totalSteps - 1, newIndex));
+    const currentStep = timeSteps[this.activeEmagramTimeIndex];
+    if (!currentStep) return;
+
+    // 1. Update timestamp badge
+    const headerTimeEl = this.container.querySelector('#emagram-header-time');
+    if (headerTimeEl) {
+      const d = new Date(currentStep.timestamp);
+      const optionsHeader = { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' };
+      headerTimeEl.textContent = d.toLocaleDateString('en-GB', optionsHeader);
+    }
+
+    // 2. Update date & step label
+    const dateLabelEl = this.container.querySelector('#emagram-date-label');
+    if (dateLabelEl) {
+      const d = new Date(currentStep.timestamp);
+      const optionsDate = { weekday: 'short', day: '2-digit', month: '2-digit' };
+      dateLabelEl.textContent = d.toLocaleDateString('de-CH', optionsDate);
+    }
+
+    const stepLabelEl = this.container.querySelector('#emagram-step-label');
+    if (stepLabelEl) {
+      stepLabelEl.textContent = `Prognoseschritt ${this.activeEmagramTimeIndex + 1} / ${totalSteps}`;
+    }
+
+    // 3. Update slider input value & cursor indicator
+    const slider = this.container.querySelector('#emagram-time-slider');
+    if (slider && parseInt(slider.value, 10) !== this.activeEmagramTimeIndex) {
+      slider.value = this.activeEmagramTimeIndex;
+    }
+
+    const cursor = this.container.querySelector('#emagram-cursor-indicator');
+    if (cursor) {
+      const pct = (this.activeEmagramTimeIndex / Math.max(1, totalSteps - 1)) * 100;
+      cursor.style.left = `${pct}%`;
+    }
+
+    // 4. Update SVG Curves in-place without destroying DOM
+    const curves = this.computeSoundingCurves(currentStep.levels);
+    const dewPoly = this.container.querySelector('#emagram-dew-polyline');
+    if (dewPoly) dewPoly.setAttribute('points', curves.dewPolyline);
+
+    const tempLayer = this.container.querySelector('#emagram-temp-segments');
+    if (tempLayer) tempLayer.innerHTML = curves.tempSegmentsSvg;
+
+    const windPoly = this.container.querySelector('#emagram-wind-polyline');
+    if (windPoly) windPoly.setAttribute('points', curves.windPolyline);
+
+    const windBarbsLayer = this.container.querySelector('#emagram-wind-barbs');
+    if (windBarbsLayer) windBarbsLayer.innerHTML = curves.windBarbsSvg;
   }
 
   updateEmagramDetailDOM() {
@@ -998,8 +1143,8 @@ export class ForecastView {
 
     if (slider) {
       slider.addEventListener('input', (e) => {
-        this.activeEmagramTimeIndex = parseInt(e.target.value, 10);
-        this.updateEmagramDetailDOM();
+        const idx = parseInt(e.target.value, 10);
+        this.updateEmagramTimeStepDOM(idx);
       });
     }
 
@@ -1033,8 +1178,8 @@ export class ForecastView {
 
   stepEmagramTime(delta) {
     const totalSteps = (this.emagramForecastData?.timeSteps || []).length || 1;
-    this.activeEmagramTimeIndex = (this.activeEmagramTimeIndex + delta + totalSteps) % totalSteps;
-    this.updateEmagramDetailDOM();
+    const nextIdx = (this.activeEmagramTimeIndex + delta + totalSteps) % totalSteps;
+    this.updateEmagramTimeStepDOM(nextIdx);
   }
 
   toggleEmagramPlay() {
@@ -1043,7 +1188,20 @@ export class ForecastView {
     } else {
       this.startEmagramPlayer();
     }
-    this.updateEmagramDetailDOM();
+    const playBtn = this.container.querySelector('#emagram-play-btn');
+    if (playBtn) {
+      playBtn.classList.toggle('playing', this.isPlayingEmagram);
+      playBtn.innerHTML = this.isPlayingEmagram ? `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="4" width="4" height="16"></rect>
+          <rect x="14" y="4" width="4" height="16"></rect>
+        </svg>
+      ` : `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+      `;
+    }
   }
 
   startEmagramPlayer() {
@@ -1287,7 +1445,15 @@ export class ForecastView {
 
   sanitizeHtml(rawHtml) {
     if (!rawHtml) return '';
+    let html = rawHtml;
     const bodyMatch = rawHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-    return bodyMatch ? bodyMatch[1] : rawHtml;
+    if (bodyMatch) {
+      html = bodyMatch[1];
+    }
+    // Remove all <style> blocks to prevent upstream css poisoning (such as user-select: none)
+    html = html.replace(/<style[\s\S]*?<\/style>/gi, '');
+    html = html.replace(/user-select\s*:\s*none;?/gi, '');
+    html = html.replace(/-webkit-user-select\s*:\s*none;?/gi, '');
+    return html;
   }
 }
