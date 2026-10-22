@@ -359,7 +359,86 @@ Reversed from `apk_analysis/unpacked/assets/map/layers/bazl_obstacles/style.json
 
 ---
 
-## 6. Web Architecture & Implementation
+## 6. Data Query Architecture: Direct Frontend vs. Backend Proxy Pipeline
+
+To ensure 60 FPS map panning, instant layer toggles, and rock-solid reliability without triggering browser security violations (CORS) or freezing the client thread with multi-megabyte payloads, network queries are partitioned into **Direct Frontend Queries** and an **Intelligent Backend Proxy Pipeline**:
+
+```
+                       +---------------------------------------+
+                       |           Browser Frontend            |
+                       +---------------------------------------+
+                                  /                 \
+                    [Direct Query]                   [Proxied Query]
+                    CORS allowed                      CORS restricted OR
+                    Static & light                    Heavy calculation OR
+                    CDN tile caches                   Enormous GIS dataset OR
+                                  /                   OAuth2 secrets / PKCE
+                                 v                             v
+                   +--------------------+             +------------------+
+                   | External Providers |             | Node Backend API |
+                   | (Swisstopo, OSM,   |             | (Express / Node) |
+                   |  Static CDN files) |             +------------------+
+                   +--------------------+                      |
+                                                         [Processing]
+                                                         - Spatial indexing (0.1°)
+                                                         - Physics & lapse rates
+                                                         - CORS negotiation
+                                                         - Multi-station deltas
+                                                         - Memory/disk caching
+                                                               |
+                                                               v
+                                                      +--------------------+
+                                                      | Upstream APIs      |
+                                                      | (Keycloak, BAZL,   |
+                                                      |  MeteoSwiss ICON,  |
+                                                      |  Ubique WS)        |
+                                                      +--------------------+
+```
+
+### 6.1 Architectural Principles for Route Placement
+
+1. **Direct Frontend Queries** are used exclusively when the upstream endpoint:
+   - Emits permissive public CORS headers (`Access-Control-Allow-Origin: *`).
+   - Serves pre-tiled, highly cacheable image assets (WMTS raster/satellite tiles, pre-rendered animation frames).
+   - Is lightweight enough to be ingested directly without degrading browser rendering performance.
+2. **Backend Proxy Routing & Processing** is mandatory when any of the following apply:
+   - **Cross-Origin Resource Sharing (CORS)**: Upstream APIs do not permit browser-origin requests.
+   - **Enormous Spatial Payloads**: GIS datasets (such as BAZL Obstacles with 225,000+ features and 122 MB uncompressed data) would choke browser DOM and Leaflet canvas rendering. The backend performs spatial binning and zoom Level of Detail (LOD) filtering.
+   - **Multi-Step Mathematical & Meteorological Modeling**: Sounding emagram profiles require resolving nearest EPSG:4326 model grid points, querying multi-level runs, and computing vertical lapse rates, dew points via Magnus-Tetens, and wind vectors.
+   - **Station Telemetry Pair Calculations**: Föhn and pressure gradient vectors require cross-referencing multiple live weather stations (`KLO_LUG`, `GVE_GUT`, etc.), reducing pressures to QNH, and calculating delta values that upstream does not provide as a consolidated endpoint.
+   - **OAuth2 / OIDC Security**: PKCE code verifier storage, Keycloak secret exchanges, and session token persistence.
+
+---
+
+### 6.2 Comprehensive Data Flow Matrix
+
+| Data Endpoint / Resource | Upstream Source / Origin | Query Path | Why Proxied? / Why Direct? | Backend Processing & Transformation Performed |
+| :--- | :--- | :--- | :--- | :--- |
+| **Swisstopo Pixelkarte (Farbe)** | `wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/...` | **Direct** | Official public WMTS tile cache; CORS enabled; pre-rendered EPSG:3857 tiles. | None (Browser directly renders image tiles via Leaflet). |
+| **Swisstopo Swissimage (Luftbild)** | `wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/...` | **Direct** | Official public satellite orthophoto cache; CORS enabled. | None. |
+| **Swisstopo Pixelkarte-Grau (Light Base Map)** | `wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/...` | **Direct** | Official public greyscale topographic map; CORS enabled. | None. |
+| **OpenStreetMap Tiles** | `*.tile.openstreetmap.org/{z}/{x}/{y}.png` | **Direct** | Public OpenStreetMap tile servers with CORS. | None. |
+| **Flying Sites (`flyingsites.geojson`)** | `shv-app-static-prod.ubmeteo.io/v1/flyingsites.geojson` (with `/data/` fallback) | **Direct** | 1,341 features (~450 KB); small enough for browser memory; CORS enabled. | Pre-packaged locally in `public/data/`, fallback to live CDN. |
+| **Airspaces (`airspaces.geojson`)** | `shv-app-static-prod.ubmeteo.io/v1/airspaces/shv.geojson` (with `/data/` fallback) | **Direct** | 353 airspace polygons (~600 KB); fast Leaflet GeoJSON layer; CORS enabled. | Pre-packaged locally in `public/data/`, fallback to live CDN. |
+| **Wildlife Reserves (`wildschutz.geojson`)** | `shv-app-static-prod.ubmeteo.io/v1/wildschutz/shv.geojson` (with `/data/` fallback) | **Direct** | 51 reserve polygons (~250 KB); small payload; CORS enabled. | Pre-packaged locally in `public/data/`, fallback to live CDN. |
+| **Days Overview Animation Frames** | `static-prod.ubmeteo.io/v1/animation/switzerland/days_overview/...` | **Direct** | Pre-rendered WebP raster frames; CORS enabled; pre-cached by browser `Image()`. | None. |
+| **BAZL Aviation Obstacles BBox (`/api/obstacles`)** | `shv-app-static-prod.ubmeteo.io/v1/obstacles/bazl.geojson` | **Proxied** | **Critical Performance**: Upstream dataset is 122 MB (225,389 features). Loading into browser freezes Leaflet. | 1. 24h disk caching of 122MB dataset.<br/>2. In-memory $0.1^\circ$ spatial grid index (~45 ms build).<br/>3. Sub-millisecond ($<0.5$ ms) bounding-box queries.<br/>4. Multi-tier zoom LOD filtering (z6 lines, z8 symbols, z13 pylon dots). |
+| **BAZL Vector Tiles (`/api/obstacles/tiles/...`)** | `shv-app-static-prod.ubmeteo.io/v1/obstacles/tiles/bazl/{z}/{x}/{y}.pbf` | **Proxied** | Caching, connection pooling, and resilient local fallback. | Local file caching (`server/cache/tile_*.pbf`), protobuf MIME negotiation (`application/x-protobuf`). |
+| **Live Ground Stations (`/api/measurements`)** | `weather-ws-prod.ubmeteo.io/v1/measurements` | **Proxied** | Browser CORS restrictions on `weather-ws-prod`; rate limiting protection. | 1. In-memory 60s TTL caching.<br/>2. Normalizes wind speed/gust to km/h.<br/>3. Converts temperatures Kelvin -> °C.<br/>4. Formats station properties for Leaflet marker clustering. |
+| **Alpine Webcams (`/api/webcams`)** | `webcam-prod.ubmeteo.io/v1/webcams` | **Proxied** | Browser CORS restrictions on `webcam-prod`; heavy JSON payload. | 1. In-memory 120s TTL caching.<br/>2. Resolves Panomax/Roundshot thumbnail and HD URLs.<br/>3. Filters out broken or inactive webcams outside Switzerland. |
+| **Föhn Transects (`/api/foehn`)** | `weather-ws-prod.ubmeteo.io/v1/measurements` | **Proxied** | **Custom Meteorological Synthesis**: Upstream provides raw station data, but no pre-calculated transects. | 1. Extracts station pairs (`KLO_LUG`, `GVE_GUT`, `PIL_MTR`, `DEM_GRE`).<br/>2. Calculates sea-level reduced pressure differences ($\Delta p$).<br/>3. Calculates alpine temperature differences ($\Delta T$).<br/>4. Categorizes danger thresholds (Moderate/Severe Föhn).<br/>5. Synthesizes GeoJSON midpoint linestrings for map overlay. |
+| **Text Forecasts (`/api/meteo/text-forecast/:lang`)** | `shv-app-ws-prod.shv-app.ch/v1/text/forecast/{lang}.json` | **Proxied** | Browser CORS restrictions on `shv-app-ws-prod`. | 1. Multi-tier forecast aggregation (Regional, Paragliding, Soaring, Synoptic).<br/>2. 15-minute memory caching.<br/>3. Stale-while-revalidate fallback resilience. |
+| **Synoptic Surface Isobars (`/api/meteo/isobaren/:lang`)** | `shv-app-ws-prod.shv-app.ch/v1/text/isobaren/{lang}.svg` | **Proxied** | Browser CORS restrictions on `shv-app-ws-prod`. | 1. SVG payload sanitization and MIME header negotiation.<br/>2. 1-hour memory caching. |
+| **Station Telemetry Timeseries (`/api/measurements/timeseries/:id`)** | `weather-ws-prod.ubmeteo.io/v1/measurements/timeseries/{id}` | **Proxied** | Browser CORS restrictions; complex query parameter formatting. | 1. Injects required telemetry parameters (`wind_speed,wind_gust_peak,wind_direction,temperature,pressure_standard_msl`).<br/>2. Normalizes timestamps and units.<br/>3. 5-minute memory caching. |
+| **Days Overview Metadata (`/api/meteo/outlooks`)** | `static-prod.ubmeteo.io/v1/animation/switzerland/days_overview.json` | **Proxied** | Prevents intermittent upstream 503/timeout red boxes on client. | 1. Extended 30-minute cache TTL with stale-while-revalidate.<br/>2. Guarantees 100% uptime for animation sequence definitions. |
+| **Previtemps Station Catalog (`/api/meteo/previtemps/stations`)** | Decompiled APK station database (`fl5.java`, `sl2.java`) | **Proxied (Internal)** | Static embedded catalog of 107 Swiss sounding stations. | Formats station identifiers, elevations, and geographic coordinates into clean JSON API response. |
+| **MeteoSwiss ICON-CH1 Sounding (`/api/emagram/sounding`, `/api/meteo/previtemps/forecast`)** | `static-prod.ubmeteo.io/v1/products/grid/10/{x}/{y}.json` & `weather-ws-prod.ubmeteo.io/v1/point-data/meteo_swiss:icon_ch1/...` | **Proxied** | **Heavy Multi-Step Science Pipeline**: Multiple upstream API calls, grid math, and thermodynamic profiling. | 1. Reversed zoom-10 grid math ($x, y$).<br/>2. Resolves nearest ICON-CH1 model point.<br/>3. Fetches 34 hourly timesteps of multi-level atmospheric variables.<br/>4. Magnus-Tetens dew point calculation ($T_d$).<br/>5. Wind vector math ($u, v \rightarrow$ speed & dir).<br/>6. Layer-by-layer lapse rate calculation ($\Gamma = -dT/dz \times 100$ °C/100m) for stability color bands. |
+| **Skybriefing DABS (`/api/dabs`)** | Official Skybriefing portal metadata | **Proxied (Internal)** | Dynamic daily bulletin metadata and Swiss legal consultation notices. | Generates current date-stamped URLs for daily bulletin PDF and Skybriefing portal with pilot legal advisory text. |
+| **Authentication Flow (`/api/auth/*`)** | `login.shv-fsvl.ch` (Keycloak OIDC) & `shv-app-ws-prod.shv-app.ch/v1/wms/person` | **Proxied** | **OAuth2 Security & Credentials**: PKCE state verification, token exchange, and authenticated member queries. | 1. Cryptographic PKCE code verifier and challenge generation (`S256`).<br/>2. Exchanges authorization code for JWT bearer tokens.<br/>3. Queries authenticated person registry (`/v1/wms/person`).<br/>4. Extracts pilot Brevets, IPPI card ratings, passenger permits, and insurance policies into secure local sessions. |
+
+---
+
+## 7. Web Architecture & Implementation
 
 The web version reproduces the native mobile application inside modern web browsers with zero third-party framework overhead:
 
@@ -396,7 +475,7 @@ Because modern browser security policies (Same-Origin Policy) prevent localhost 
 
 ---
 
-## 7. Zero Fake Data Policy
+## 8. Zero Fake Data Policy
 
 The application strictly adheres to the **Zero Fake Data Policy**:
 - **No Mock Profiles**: Never generate dummy names, placeholder pilot ratings, or fabricated insurance amounts.
