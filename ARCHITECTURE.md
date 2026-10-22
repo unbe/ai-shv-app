@@ -292,20 +292,34 @@ Reversed from `ShvAggregatedForecastType` and `https://static-prod.ubmeteo.io/v1
 - **`RELATIVE_SUNSHINE`**: 6-hour interval raster forecast animations (`.webp`) displaying relative sunshine duration across Switzerland (0% - 100%).
 - **`PRECIPITATION_PROBABILITY_WEAK`**: 12-hour interval raster animations mapping light precipitation probability (>0.1 mm / 12h).
 - **`PRECIPITATION_PROBABILITY_STRONG`**: 12-hour interval raster animations mapping heavy precipitation probability (>1.0 mm / 12h).
-- Interactive timeline stepper, time range labels, and play/pause animation cycle.
+- **In-place DOM Animation Engine**: Step and play updates modify image source, time interval label, step indicators, and range slider directly in-place without triggering full view re-renders, preventing scroll resets. Next frames are pre-cached in memory for seamless playback.
 
-### Previtemps Sounding Stations & Thermodynamic Emagram Engine
-Reversed from `fl5.java` and `ch.ubique.fluidsdk.reports.common.models.b`:
-- **107 Sounding Locations**: Extracted with exact geographic coordinates and elevations covering the entire Swiss Alpine space (Payerne, Engelberg, Interlaken, Fiesch, Davos, Scuol, Zermatt, Chur, Zürich, Sion, etc.).
-- **Interactive Map**: Leaflet sounding map allowing pilots to select any station or search by name.
-- **Thermodynamic Calculation Engine (`server/emagram_calc.py`)**:
-  - Calculates Lifting Condensation Level (LCL / Wolkenbasis) using Bolton 1980 equations.
-  - Detects atmospheric inversions and capping barriers.
-  - Calculates Convective Trigger Temperature (Auslösetemperatur).
-  - Computes dry & moist adiabatic parcel ascent curve (DALR / MALR).
-  - Determines thermal ceiling (Thermik-Obergrenze), usable depth, and average climb rates ($w_{\text{avg}}$ in m/s).
-  - Provides vertical winds aloft profiles (1000m to 5000m).
-  - Features an interactive surface temperature slider to simulate daytime heating and live recomputation of cloud base and thermals.
+### Previtemps Sounding Stations & Genuine MeteoSwiss ICON-CH1 Emagram
+Reversed from `fl5.java`, `sl2.java`, `xh7.java`, `ki4.java`, and `u62.java`:
+- **107 Sounding Locations**: Extracted with exact geographic coordinates and elevations covering the entire Swiss Alpine space (Interlaken, Engelberg, Payerne, Fiesch, Davos, Scuol, Zermatt, Chur, Zürich, Sion, etc.).
+- **Keyless High-Resolution Map**: Leaflet sounding map powered by official Swisstopo Pixelkarte WMTS (`ch.swisstopo.pixelkarte-farbe`), eliminating external CartoDB dependencies and "API KEY REQUIRED" errors.
+- **EPSG:4326 Grid Tile Resolution (`xh7.java`)**:
+  - Zoom 10 tile coordinates derived via:
+    $x = \lfloor (180.0 + \text{lon}) / 0.3515625 \rfloor$, $y = \lfloor (90.0 - \text{lat}) / 0.17578125 \rfloor$.
+  - Grid definition fetched from `https://static-prod.ubmeteo.io/v1/products/grid/10/{x}/{y}.json`.
+  - Maps any station to the nearest `meteo_swiss:icon_ch1` or `meteo_swiss:icon_ch2` model grid point.
+- **Hourly Point-Data Sounding Engine (`server/emagram_provider.js`)**:
+  - Latest model run fetched from `https://weather-ws-prod.ubmeteo.io/v1/point-data/meteo_swiss:icon_ch1/runs`.
+  - Multi-level atmospheric profiles fetched across 34 hourly timesteps:
+    `temperature`, `pressure`, `specific_humidity`, `height_half_level`, `wind_u`, `wind_v`.
+  - Dew point derived via Magnus-Tetens from vapor pressure $e = \frac{q \cdot p}{0.622 + 0.378 \cdot q}$.
+  - Wind speed ($km/h$) and direction ($0^\circ-360^\circ$) computed from vector components $u, v$.
+- **Android Native Visual Parity**:
+  - **Lapse Rate Color Scale**: Temperature curve segmented and dynamically colored by vertical temperature lapse rate $\Gamma = -\frac{dT}{dz} \times 100$ (°C / 100m):
+    - Yellow ($\ge 0.0$ °C/100m, Inversion layer)
+    - Light Green ($-0.3$ to $0.0$ °C/100m, Weak lapse)
+    - Green ($-0.6$ to $-0.3$ °C/100m, Normal lapse / good thermals)
+    - Cyan/Blue ($-0.8$ to $-0.6$ °C/100m, Moderate instability)
+    - Red ($-1.0$ to $-0.8$ °C/100m, Strong thermals / near DALR)
+    - Purple ($< -1.0$ °C/100m, Superadiabatic)
+  - **Dashed Dew Point Curve**: Plotted alongside environmental temperature.
+  - **Right Column Wind Vector & Speed Profile**: Dedicated wind barb column and $0-45$ km/h wind speed line.
+  - **Interactive Time Selector Bar**: Horizontal timeline with hour marks, current time indicator, stepper controls (`<<` / `>>`), and play button for smooth animation across the forecast day.
 
 ### Unified Map Controls Architecture
 All map controls are consolidated into a **single, unified control drawer** (`#map-layers-drawer`):

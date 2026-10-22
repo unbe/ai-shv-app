@@ -24,8 +24,10 @@ export class ForecastView {
     // 3. Emagram & Previtemps Soundings State
     this.stations = [];
     this.selectedStation = null;
-    this.soundingData = null;
-    this.simulatedSurfaceTemp = null;
+    this.emagramForecastData = null;
+    this.activeEmagramTimeIndex = 0;
+    this.isPlayingEmagram = false;
+    this.emagramPlayTimer = null;
     this.searchQuery = '';
     this.emagramMap = null;
     this.stationMarkersLayer = null;
@@ -44,7 +46,7 @@ export class ForecastView {
     try {
       const lang = store.state.lang || 'de';
       
-      // Load Text Forecast and Outlooks in parallel
+      // Load Text Forecast, Outlooks, and Previtemps stations in parallel
       const [textData, outlooksData, stations] = await Promise.all([
         ShvApi.getTextForecast(lang),
         ShvApi.getOutlooks(),
@@ -55,14 +57,16 @@ export class ForecastView {
       this.outlooksData = outlooksData;
       this.stations = stations || [];
 
-      // Default selected sounding station: Engelberg or Payerne
+      // Default selected sounding station: Interlaken (matching Android screenshot)
       if (this.stations.length > 0) {
-        this.selectedStation = this.stations.find(s => s.name === 'Engelberg') || this.stations[0];
+        this.selectedStation = this.stations.find(s => s.name === 'Interlaken')
+                            || this.stations.find(s => s.name === 'Engelberg')
+                            || this.stations[0];
       }
 
-      // If stations available, prefetch sounding for default station
+      // Prefetch genuine ICON-CH1 forecast for default station
       if (this.selectedStation) {
-        this.loadSounding(this.selectedStation);
+        await this.loadEmagramForecast(this.selectedStation);
       }
     } catch (err) {
       console.error('[ForecastView] Error loading forecast data:', err);
@@ -78,32 +82,45 @@ export class ForecastView {
 
   unmount() {
     this.stopOutlookPlayer();
+    this.stopEmagramPlayer();
     if (this.emagramMap) {
       this.emagramMap.remove();
       this.emagramMap = null;
     }
   }
 
-  async loadSounding(station, surfaceTemp = null) {
+  async loadEmagramForecast(station) {
     if (!station) return;
     this.soundingLoading = true;
-    this.updateSoundingCard();
+    this.updateEmagramDetailDOM();
 
     try {
-      const data = await ShvApi.getPrevitempsSounding(station.name, surfaceTemp, null);
+      const data = await ShvApi.getEmagramForecast(station.name, station.lat, station.lon);
       if (data && !data.error) {
-        this.soundingData = data;
-        if (surfaceTemp !== null) {
-          this.simulatedSurfaceTemp = surfaceTemp;
-        } else if (data.surface) {
-          this.simulatedSurfaceTemp = data.surface.temp;
+        this.emagramForecastData = data;
+        
+        // Pick the timestep closest to current time if possible
+        if (data.validTimes && data.validTimes.length > 0) {
+          const now = Date.now();
+          let closestIdx = 0;
+          let minDiff = Infinity;
+          for (let i = 0; i < data.validTimes.length; i++) {
+            const diff = Math.abs(data.validTimes[i] - now);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestIdx = i;
+            }
+          }
+          this.activeEmagramTimeIndex = closestIdx;
+        } else {
+          this.activeEmagramTimeIndex = 0;
         }
       }
     } catch (err) {
-      console.error('[ForecastView] Error fetching sounding for', station.name, err);
+      console.error('[ForecastView] Error fetching emagram forecast for', station.name, err);
     } finally {
       this.soundingLoading = false;
-      this.updateSoundingCard();
+      this.updateEmagramDetailDOM();
     }
   }
 
@@ -187,7 +204,7 @@ export class ForecastView {
   }
 
   // =========================================================================
-  // 1. TEXT FORECAST SECTION (Regional, Gleitschirm, Segelflug, Allgemein)
+  // 1. TEXT FORECAST SECTION
   // =========================================================================
 
   renderTextSection(lang) {
@@ -207,58 +224,73 @@ export class ForecastView {
         '1': 'Sud delle Alpi & Engadina',
         '2': 'Svizzera romanda & Vallese',
       },
-    }[lang] || {
-      '0': 'Deutschschweiz & Graubünden',
-      '1': 'Alpensüdseite & Engadin',
-      '2': 'Westschweiz & Wallis',
-    };
+    }[lang] || regionLabels.de;
 
-    let activeIssueTime = null;
+    const tf = this.textForecastData || {};
+
     let contentHtml = '';
-    let categoryBadge = 'MeteoSchweiz & SHV';
-    let categoryTitle = 'Alpines Flugwetter';
+    let categoryTitle = '';
+    let issueTimeStr = '';
 
     if (this.activeTextCategory === 'regional') {
-      categoryBadge = 'Regionalprognose';
-      categoryTitle = 'Regionale Flugwetter-Textprognose';
-      const regObj = this.textForecastData?.forecast;
-      activeIssueTime = regObj?.issueTime;
-      if (regObj?.text && regObj.text[this.activeRegion]) {
-        contentHtml = this.sanitizeHtml(regObj.text[this.activeRegion]);
+      categoryTitle = 'Regionalprognose (MeteoSchweiz / SHV)';
+      const regionalObj = tf.forecast && tf.forecast[this.activeRegion];
+      if (regionalObj) {
+        issueTimeStr = regionalObj.issueTime ? new Date(regionalObj.issueTime).toLocaleString('de-CH') : '';
+        const days = regionalObj.days || [];
+        contentHtml = days.map(day => `
+          <div class="text-forecast-day-card">
+            <h4 class="forecast-day-heading">${day.title || day.day || 'Tagesabschnitt'}</h4>
+            <div class="forecast-day-body">${this.sanitizeHtml(day.forecast || day.text || '')}</div>
+          </div>
+        `).join('');
+      } else {
+        contentHtml = '<p class="text-muted">Keine Regionalprognose für diesen Sektor vorhanden.</p>';
       }
     } else if (this.activeTextCategory === 'gleitschirm') {
-      categoryBadge = 'Hängegleiter & Paragliding';
-      categoryTitle = 'Offizielle Gleitschirmprognose';
-      const gleitObj = this.textForecastData?.gleitschirmForecast;
-      activeIssueTime = gleitObj?.issueTime;
-      contentHtml = gleitObj?.text ? this.sanitizeHtml(gleitObj.text) : '<p>Keine Gleitschirmprognose verfügbar.</p>';
+      categoryTitle = 'Gleitschirmprognose & Thermikbriefing';
+      const g = tf.gleitschirmForecast || tf.flugwetterForecast;
+      if (g) {
+        issueTimeStr = g.issueTime ? new Date(g.issueTime).toLocaleString('de-CH') : '';
+        contentHtml = `
+          <div class="text-forecast-day-card">
+            <div class="forecast-day-body">${this.sanitizeHtml(g.text || g.html || '<p>Keine Daten</p>')}</div>
+          </div>
+        `;
+      } else {
+        contentHtml = '<p class="text-muted">Gleitschirmprognose ist für heute noch nicht freigegeben.</p>';
+      }
     } else if (this.activeTextCategory === 'segelflug') {
-      categoryBadge = 'Segelflug & Thermik';
-      categoryTitle = 'Offizielle Segelflugprognose';
-      const segelObj = this.textForecastData?.segelflugForecast;
-      activeIssueTime = segelObj?.issueTime;
-      contentHtml = segelObj?.text ? this.sanitizeHtml(segelObj.text) : '<p>Keine Segelflugprognose verfügbar.</p>';
+      categoryTitle = 'Segelflug- & Flugwetterprognose';
+      const s = tf.segelflugForecast;
+      if (s) {
+        issueTimeStr = s.issueTime ? new Date(s.issueTime).toLocaleString('de-CH') : '';
+        contentHtml = `
+          <div class="text-forecast-day-card">
+            <div class="forecast-day-body">${this.sanitizeHtml(s.text || s.html || '<p>Keine Daten</p>')}</div>
+          </div>
+        `;
+      } else {
+        contentHtml = '<p class="text-muted">Segelflugprognose wird um 08:30 Uhr aktualisiert.</p>';
+      }
     } else if (this.activeTextCategory === 'general') {
-      categoryBadge = 'Synoptik Schweiz';
-      categoryTitle = 'Allgemeine Wetterlage';
-      const genObj = this.textForecastData?.generalForecast;
-      activeIssueTime = genObj?.issueTime;
-      contentHtml = genObj?.text ? this.sanitizeHtml(genObj.text) : '<p>Keine allgemeine Lage verfügbar.</p>';
+      categoryTitle = 'Allgemeine Wetterlage (Synoptik)';
+      const gen = tf.generalForecast;
+      if (gen) {
+        issueTimeStr = gen.issueTime ? new Date(gen.issueTime).toLocaleString('de-CH') : '';
+        contentHtml = `
+          <div class="text-forecast-day-card">
+            <div class="forecast-day-body">${this.sanitizeHtml(gen.text || gen.html || '<p>Keine Daten</p>')}</div>
+          </div>
+        `;
+      } else {
+        contentHtml = '<p class="text-muted">Synoptische Übersicht derzeit nicht verfügbar.</p>';
+      }
     }
-
-    const issueTimeStr = activeIssueTime
-      ? new Date(activeIssueTime).toLocaleString(lang === 'de' ? 'de-CH' : 'fr-CH', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : null;
 
     return `
       <div class="forecast-content-card">
-        <!-- Text Category Switcher Pills -->
+        <!-- Sub-Navigation for Forecast Types -->
         <div class="text-category-switcher-row">
           <button data-cat="regional" class="category-pill ${this.activeTextCategory === 'regional' ? 'active' : ''}">
             🏔️ Regional
@@ -276,13 +308,12 @@ export class ForecastView {
 
         <div class="section-header-row" style="margin-top: 14px;">
           <div>
-            <span class="badge-tag">${categoryBadge}</span>
+            <span class="badge-tag">MeteoSchweiz & SHV</span>
             <h2 class="section-heading">${categoryTitle}</h2>
             ${issueTimeStr ? `<p class="section-sub">Ausgabe: ${issueTimeStr}</p>` : ''}
           </div>
         </div>
 
-        <!-- Sub-Pills for Regions (only shown when category === 'regional') -->
         ${this.activeTextCategory === 'regional' ? `
           <div class="region-pills-row">
             <button data-region="0" class="region-pill ${this.activeRegion === '0' ? 'active' : ''}">${regionLabels['0']}</button>
@@ -304,27 +335,25 @@ export class ForecastView {
   // 2. OUTLOOKS SECTION ("Aussichten" - Days Overview Animation Maps)
   // =========================================================================
 
-  renderOutlooksSection(lang) {
-    if (!this.outlooksData || !this.outlooksData.data) {
-      return `
-        <div class="forecast-content-card">
-          <div class="error-notice">Keine Aussichtsdaten verfügbar.</div>
-        </div>
-      `;
-    }
+  getOutlookFiles() {
+    if (!this.outlooksData || !this.outlooksData.data) return [];
+    // Prioritize 6h datasets for highest resolution animations
+    const matching = this.outlooksData.data.filter(d => d.type === this.activeOutlookType);
+    if (!matching.length) return [];
+    const bestSet = matching.find(d => d.files && d.files.length >= 20) || matching[0];
+    return bestSet.files || [];
+  }
 
-    const currentDataSet = this.outlooksData.data.find(d => d.type === this.activeOutlookType);
-    const files = (currentDataSet && currentDataSet.files) || [];
+  renderOutlooksSection(lang) {
+    const files = this.getOutlookFiles();
     const totalFiles = files.length;
     
-    // Clamp active index
     if (this.activeOutlookIndex >= totalFiles) {
       this.activeOutlookIndex = Math.max(0, totalFiles - 1);
     }
     const currentFileObj = files[this.activeOutlookIndex];
 
-    // Format current interval date/time
-    let intervalLabel = 'Keine Zeitspanne';
+    let intervalLabel = 'Lade Zeitspanne...';
     if (currentFileObj) {
       const dStart = new Date(currentFileObj.start);
       const dEnd = new Date(currentFileObj.end);
@@ -337,7 +366,6 @@ export class ForecastView {
       ? `https://static-prod.ubmeteo.io/${currentFileObj.file}`
       : '';
 
-    // Legend configuration based on active type
     const legendConfig = {
       RELATIVE_SUNSHINE: {
         title: 'Relative Sonnenscheindauer (6h)',
@@ -387,15 +415,15 @@ export class ForecastView {
               <strong class="outlook-time-text">${intervalLabel}</strong>
             </div>
             <div class="outlook-step-indicator">
-              Intervall ${this.activeOutlookIndex + 1} von ${totalFiles}
+              Intervall ${this.activeOutlookIndex + 1} von ${totalFiles || 1}
             </div>
           </div>
 
           <div class="outlook-image-wrapper">
             ${imageUrl ? `
-              <img src="${imageUrl}" alt="Aussichten Karte" class="outlook-map-img" loading="eager" />
+              <img id="outlook-map-img" src="${imageUrl}" alt="Aussichten Karte" class="outlook-map-img" loading="eager" />
             ` : `
-              <div class="outlook-empty-box">Keine Kartendaten für diese Auswahl</div>
+              <div class="outlook-empty-box">Kartendaten werden geladen...</div>
             `}
           </div>
 
@@ -451,22 +479,118 @@ export class ForecastView {
     `;
   }
 
+  updateOutlookDOM() {
+    const files = this.getOutlookFiles();
+    const totalFiles = files.length;
+    if (this.activeOutlookIndex >= totalFiles) {
+      this.activeOutlookIndex = Math.max(0, totalFiles - 1);
+    }
+    const currentFileObj = files[this.activeOutlookIndex];
+    if (!currentFileObj) return;
+
+    // 1. Update image in-place
+    const imgEl = this.container.querySelector('#outlook-map-img');
+    if (imgEl) {
+      imgEl.src = `https://static-prod.ubmeteo.io/${currentFileObj.file}`;
+    }
+
+    // 2. Update time label
+    const timeEl = this.container.querySelector('.outlook-time-text');
+    if (timeEl) {
+      const dStart = new Date(currentFileObj.start);
+      const dEnd = new Date(currentFileObj.end);
+      const optionsDay = { weekday: 'short', day: '2-digit', month: '2-digit' };
+      const optionsTime = { hour: '2-digit', minute: '2-digit' };
+      timeEl.textContent = `${dStart.toLocaleDateString('de-CH', optionsDay)} ${dStart.toLocaleTimeString('de-CH', optionsTime)} – ${dEnd.toLocaleTimeString('de-CH', optionsTime)}`;
+    }
+
+    // 3. Update step indicator
+    const stepEl = this.container.querySelector('.outlook-step-indicator');
+    if (stepEl) {
+      stepEl.textContent = `Intervall ${this.activeOutlookIndex + 1} von ${totalFiles}`;
+    }
+
+    // 4. Update slider value
+    const slider = this.container.querySelector('#outlook-slider');
+    if (slider) {
+      slider.value = this.activeOutlookIndex;
+    }
+
+    // 5. Update play button icon
+    const playBtn = this.container.querySelector('#outlook-play-btn');
+    if (playBtn) {
+      if (this.isPlayingOutlooks) {
+        playBtn.classList.add('playing');
+        playBtn.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+          </svg>
+        `;
+      } else {
+        playBtn.classList.remove('playing');
+        playBtn.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+        `;
+      }
+    }
+
+    // 6. Prefetch next 2 frames
+    const nextIdx = (this.activeOutlookIndex + 1) % totalFiles;
+    if (files[nextIdx]) {
+      new Image().src = `https://static-prod.ubmeteo.io/${files[nextIdx].file}`;
+    }
+  }
+
+  stepOutlook(delta) {
+    const files = this.getOutlookFiles();
+    const totalFiles = files.length || 1;
+    this.activeOutlookIndex = (this.activeOutlookIndex + delta + totalFiles) % totalFiles;
+    this.updateOutlookDOM();
+  }
+
+  toggleOutlookPlay() {
+    if (this.isPlayingOutlooks) {
+      this.stopOutlookPlayer();
+    } else {
+      this.startOutlookPlayer();
+    }
+    this.updateOutlookDOM();
+  }
+
+  startOutlookPlayer() {
+    this.isPlayingOutlooks = true;
+    this.outlookPlayTimer = setInterval(() => {
+      this.stepOutlook(1);
+    }, 1200);
+  }
+
+  stopOutlookPlayer() {
+    this.isPlayingOutlooks = false;
+    if (this.outlookPlayTimer) {
+      clearInterval(this.outlookPlayTimer);
+      this.outlookPlayTimer = null;
+    }
+  }
+
   // =========================================================================
-  // 3. EMAGRAM & PREVITEMPS SECTION (Sounding Map + Skew-T Diagram + Metrics)
+  // 3. EMAGRAM & PREVITEMPS SECTION (Android-style Sounding Diagram & Timeline)
   // =========================================================================
 
   renderEmagramSection(lang) {
     const popularStations = [
-      'Payerne', 'Engelberg', 'Interlaken', 'Fiesch', 'Zermatt', 'Scuol', 'Davos', 'Chur', 'Zürich', 'Sion'
+      'Interlaken', 'Engelberg', 'Payerne', 'Fiesch', 'Zermatt', 'Scuol', 'Davos', 'Chur', 'Zürich', 'Sion'
     ];
 
     return `
       <div class="forecast-content-card">
         <div class="section-header-row">
           <div>
-            <span class="badge-tag">Previtemps & Soundings</span>
+            <span class="badge-tag">Previtemps & Soundings (MeteoSchweiz ICON-CH1)</span>
             <h2 class="section-heading">Thermodynamische Emagramme & Previtemps</h2>
-            <p class="section-sub">107 alpine Radiosondierungs- & Thermikstationen in der Schweiz und Alpenregion</p>
+            <p class="section-sub">107 alpine Radiosondierungs- & Thermikstationen mit hochauflösenden Stunden-Soundings</p>
           </div>
         </div>
 
@@ -481,7 +605,7 @@ export class ForecastView {
               <input 
                 type="text" 
                 id="emagram-station-search" 
-                placeholder="Station suchen (z.B. Engelberg, Fiesch, Payerne, Interlaken)..." 
+                placeholder="Station suchen (z.B. Interlaken, Engelberg, Fiesch, Payerne)..." 
                 value="${this.searchQuery}"
               />
             </div>
@@ -501,245 +625,443 @@ export class ForecastView {
             }).join('')}
           </div>
 
-          <!-- Leaflet Sounding Stations Map Container -->
+          <!-- Leaflet Sounding Stations Map Container (Swisstopo Pixelkarte, Keyless) -->
           <div id="emagram-map" class="emagram-leaflet-map"></div>
-          <div class="map-hint-text">💡 Klicke auf eine Station auf der Karte, um das vertikale Sounding und die Thermikwerte anzuzeigen.</div>
+          <div class="map-hint-text">💡 Klicke auf eine Station auf der Schweizer Karte, um das vertikale Sounding zu öffnen.</div>
         </div>
 
-        <!-- Selected Station Sounding Card -->
-        <div id="emagram-detail-container" class="emagram-detail-box">
-          ${this.renderSoundingDetailContent()}
+        <!-- Android Native Emagram Frame -->
+        <div id="emagram-detail-container" class="emagram-detail-box" style="border:none; padding:0; margin-top:16px;">
+          ${this.renderEmagramAndroidCard()}
         </div>
       </div>
     `;
   }
 
-  renderSoundingDetailContent() {
+  renderEmagramAndroidCard() {
     if (!this.selectedStation) {
       return `<div class="info-notice">Bitte wähle eine Station auf der Karte aus.</div>`;
     }
 
-    if (this.soundingLoading && !this.soundingData) {
+    if (this.soundingLoading && !this.emagramForecastData) {
       return `
         <div class="loading-spinner" style="padding: 40px 0;">
           <div class="spinner"></div>
-          <span>Emagramm für ${this.selectedStation.name} wird berechnet...</span>
+          <span>Emagramm für ${this.selectedStation.name} wird geladen...</span>
         </div>
       `;
     }
 
-    const d = this.soundingData;
-    const st = this.selectedStation;
-    const surfaceT = this.simulatedSurfaceTemp !== null ? this.simulatedSurfaceTemp : (d?.surface?.temp || 15);
-    const lclAlt = d?.cloud_base_lcl?.alt_asl || (st.elevation + 900);
-    const lclAgl = d?.cloud_base_lcl?.height_agl || 900;
-    const trigT = d?.trigger_temperature_c || (surfaceT + 2.0);
-    const thermalCeil = d?.thermal_ceiling_asl || lclAlt;
-    const climbRate = d?.climb_rate_avg_ms || 1.8;
-    const rating = d?.thermal_rating || 'Mässig';
-    const inversions = d?.inversions || [];
-    const levels = d?.sounding_levels || [];
+    const data = this.emagramForecastData;
+    const timeSteps = data?.timeSteps || [];
+    const totalSteps = timeSteps.length;
+    
+    if (this.activeEmagramTimeIndex >= totalSteps) {
+      this.activeEmagramTimeIndex = Math.max(0, totalSteps - 1);
+    }
+    const currentStep = timeSteps[this.activeEmagramTimeIndex];
 
-    // SVG Diagram dimensions
-    const svgWidth = 480;
-    const svgHeight = 260;
-    const padX = 40;
-    const padY = 24;
-    const plotW = svgWidth - padX - 20;
-    const plotH = svgHeight - padY - 24;
+    // Format header timestamp matching screenshot (e.g. "Thu, 22. Oct, 19:00")
+    let headerTimeStr = 'Lade Zeitpunkt...';
+    let dateLabel = 'Heute';
+    if (currentStep) {
+      const d = new Date(currentStep.timestamp);
+      const optionsHeader = { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' };
+      headerTimeStr = d.toLocaleDateString('en-GB', optionsHeader);
+      
+      const optionsDate = { weekday: 'short', day: '2-digit', month: '2-digit' };
+      dateLabel = d.toLocaleDateString('de-CH', optionsDate);
+    }
 
-    // Altitude mapping (elevation to 5000m)
-    const minAlt = Math.max(0, st.elevation);
-    const maxAlt = 5000;
-    const altToY = (a) => padY + plotH - ((a - minAlt) / (maxAlt - minAlt)) * plotH;
+    const levels = currentStep?.levels || [];
 
-    // Temperature mapping (-25°C to +35°C)
-    const minT = -25;
-    const maxT = 35;
-    const tempToX = (t) => padX + ((t - minT) / (maxT - minT)) * plotW;
+    // SVG Drawing Setup
+    // Width 520, Height 640
+    const svgW = 520;
+    const svgH = 620;
+    const padL = 46;
+    const padR = 18;
+    const padT = 32;
+    const padB = 60;
 
-    // Generate Path for Environment Temp T(z)
-    const tPoints = levels.map(l => `${tempToX(l.t)},${altToY(l.alt)}`).join(' ');
-    // Generate Path for Dewpoint Td(z)
-    const tdPoints = levels.map(l => `${tempToX(l.td)},${altToY(l.alt)}`).join(' ');
-    // Generate Path for Parcel Ascent
-    const parcelPoints = (d?.parcel_curve || []).map(p => `${tempToX(p.parcel_t)},${altToY(p.alt)}`).join(' ');
+    const plotW = 340;
+    const windW = 100;
+    const plotH = svgH - padT - padB;
 
-    const lclY = altToY(lclAlt);
+    // Pressure coordinates (600 hPa to 1000 hPa)
+    const pMin = 600;
+    const pMax = 1000;
+    const pToY = (p) => {
+      const clampedP = Math.max(pMin, Math.min(pMax, p));
+      return (padT + plotH) - (Math.log(pMax / clampedP) / Math.log(pMax / pMin)) * plotH;
+    };
+
+    // Temperature coordinates (-15°C to +35°C with 40° skew)
+    const tMin = -15;
+    const tMax = 35;
+    const skewFactor = 0.32;
+    const tToX = (t, y) => {
+      const baseX = padL + ((t - tMin) / (tMax - tMin)) * plotW;
+      const skewX = ((padT + plotH) - y) * skewFactor;
+      return baseX + skewX;
+    };
+
+    // Pressure grid levels
+    const pressureTicks = [1000, 900, 800, 700, 600];
+    const isobarsSvg = pressureTicks.map(p => {
+      const y = pToY(p);
+      return `
+        <line x1="${padL}" y1="${y}" x2="${padL + plotW}" y2="${y}" stroke="var(--border-color, #E2E8F0)" stroke-width="1" stroke-dasharray="3,3" />
+        <text x="${padL - 6}" y="${y + 4}" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="end">${p}</text>
+      `;
+    }).join('');
+
+    // Skewed isotherms (-10, 0, 10, 20, 30 °C)
+    const tempTicks = [-10, 0, 10, 20, 30];
+    const isothermsSvg = tempTicks.map(t => {
+      const y1 = padT + plotH;
+      const x1 = tToX(t, y1);
+      const y2 = padT;
+      const x2 = tToX(t, y2);
+      return `
+        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--border-color, #E2E8F0)" stroke-width="1" opacity="0.75" />
+        <text x="${x1}" y="${y1 + 18}" fill="#94A3B8" font-size="11" font-weight="600" text-anchor="middle">${t}</text>
+      `;
+    }).join('');
+
+    // Altitude lines & labels on right column (1000m, 2000m, 3000m, 4000m)
+    const altGridLines = [1000, 2000, 3000, 4000].map(alt => {
+      // Find approximate Y coordinate from levels matching altitude
+      let targetY = padT + plotH - (alt / 5000) * plotH;
+      const closestLvl = levels.find(l => Math.abs(l.heightM - alt) < 150);
+      if (closestLvl) {
+        targetY = pToY(closestLvl.pressHpa);
+      }
+      return `
+        <line x1="${padL + plotW}" y1="${targetY}" x2="${svgW - padR}" y2="${targetY}" stroke="var(--border-color, #E2E8F0)" stroke-width="1" stroke-dasharray="3,3" />
+        <text x="${padL + plotW + 6}" y="${targetY - 4}" fill="#94A3B8" font-size="11" font-weight="600">${alt} m</text>
+      `;
+    }).join('');
+
+    // Sounding curves: Temperature colored by lapse rate & Dew Point dashed line
+    let tempSegmentsSvg = '';
+    let dewPathPoints = [];
+    let windPoints = [];
+    let windBarbsSvg = '';
+
+    for (let i = 0; i < levels.length; i++) {
+      const lvl = levels[i];
+      const y = pToY(lvl.pressHpa);
+      const xT = tToX(lvl.tempC, y);
+      const xTd = tToX(lvl.dewC, y);
+
+      dewPathPoints.push(`${xTd.toFixed(1)},${y.toFixed(1)}`);
+
+      // Temperature curve segments
+      if (i > 0) {
+        const prevLvl = levels[i - 1];
+        const prevY = pToY(prevLvl.pressHpa);
+        const prevXT = tToX(prevLvl.tempC, prevY);
+
+        // Lapse rate color coding matching Android screenshot scale:
+        // Yellow (>= 0.0) | Light Green (-0.3 to 0.0) | Green (-0.6 to -0.3) | Cyan/Blue (-0.8 to -0.6) | Red (-1.0 to -0.8) | Purple (< -1.0)
+        let strokeColor = '#22C55E';
+        const gamma = lvl.lapseRate;
+        if (gamma >= 0.0) {
+          strokeColor = '#EAB308'; // Inversion (Yellow)
+        } else if (gamma >= -0.3) {
+          strokeColor = '#84CC16'; // Weak lapse (Light green)
+        } else if (gamma >= -0.6) {
+          strokeColor = '#22C55E'; // Normal lapse / good thermals (Green)
+        } else if (gamma >= -0.8) {
+          strokeColor = '#0EA5E9'; // Moderate instability (Blue)
+        } else if (gamma >= -1.0) {
+          strokeColor = '#EF4444'; // Strong thermals (Red)
+        } else {
+          strokeColor = '#A855F7'; // Superadiabatic (Purple)
+        }
+
+        tempSegmentsSvg += `
+          <line 
+            x1="${prevXT.toFixed(1)}" y1="${prevY.toFixed(1)}" 
+            x2="${xT.toFixed(1)}" y2="${y.toFixed(1)}" 
+            stroke="${strokeColor}" 
+            stroke-width="3.6" 
+            stroke-linecap="round" 
+          />
+        `;
+      }
+
+      // Wind curve points: speed range 0 to 45 km/h
+      const windX = (padL + plotW + 20) + Math.min(1, Math.max(0, lvl.speedKmH / 45)) * 75;
+      windPoints.push(`${windX.toFixed(1)},${y.toFixed(1)}`);
+
+      // Draw wind barbs every ~3rd level or ~400m
+      if (i % 3 === 0 || i === levels.length - 1) {
+        const barbX = padL + plotW + 12;
+        const barbY = y;
+        const speed = lvl.speedKmH;
+        const dir = lvl.dirDeg;
+        
+        // Aviation wind barb line with arrow head
+        const len = 16;
+        const rad = (dir - 90) * (Math.PI / 180);
+        const bx2 = barbX + Math.cos(rad) * len;
+        const by2 = barbY + Math.sin(rad) * len;
+
+        windBarbsSvg += `
+          <g transform="translate(${barbX}, ${barbY})" title="${speed} km/h aus ${dir}°">
+            <circle cx="0" cy="0" r="2.5" fill="#0284C7" />
+            <line x1="0" y1="0" x2="${(Math.cos(rad) * len).toFixed(1)}" y2="${(Math.sin(rad) * len).toFixed(1)}" stroke="#0284C7" stroke-width="1.8" />
+          </g>
+        `;
+      }
+    }
+
+    const dewPolyline = dewPathPoints.join(' ');
+    const windPolyline = windPoints.join(' ');
 
     return `
-      <div class="sounding-station-header">
-        <div class="station-meta-block">
-          <div class="station-title-row">
-            <h3 class="station-name">${st.name}</h3>
-            <span class="station-elev-badge">${st.elevation} m ü.M.</span>
-            <span class="station-coord-badge">${st.lat.toFixed(4)}°N, ${st.lon.toFixed(4)}°E</span>
+      <div class="emagram-android-frame">
+        <!-- Top App Navigation Bar -->
+        <div class="emagram-top-nav">
+          <button id="btn-emagram-back" class="emagram-nav-btn" title="Zurück zur Karte">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+          </button>
+
+          <div class="emagram-title-center">
+            <h3 id="emagram-station-title">${this.selectedStation.name}</h3>
+            <span>Emagram forecast</span>
           </div>
-          <p class="station-sub-text">MeteoSchweiz / Ubique Fluid Previtemps Sounding Profile</p>
+
+          <button id="btn-emagram-info" class="emagram-nav-btn" title="Emagramm-Erklärung">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+          </button>
         </div>
 
-        <!-- Surface Temperature Simulator Slider -->
-        <div class="surface-slider-box">
-          <div class="surface-slider-header">
-            <span class="slider-title">🌡️ Bodentemperatur simulieren:</span>
-            <span id="surface-temp-val" class="slider-val">${surfaceT.toFixed(1)} °C</span>
+        <!-- Meta Subheader Row -->
+        <div class="emagram-header-meta">
+          <div>
+            <div id="emagram-header-time" class="emagram-timestamp-badge">${headerTimeStr}</div>
+            <div class="emagram-model-badge">ICON-CH1 · MeteoSchweiz</div>
           </div>
-          <input 
-            type="range" 
-            id="emagram-temp-slider" 
-            class="temp-slider-input" 
-            min="5" 
-            max="35" 
-            step="0.5" 
-            value="${surfaceT}" 
-          />
-          <div class="slider-ticks">
-            <span>5°C (Morgen)</span>
-            <span>20°C (Mittag)</span>
-            <span>35°C (Hochsommer)</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Core Aerological Metrics KPI Grid -->
-      <div class="sounding-metrics-grid">
-        <div class="sounding-kpi-card">
-          <span class="kpi-icon">☁️</span>
-          <div class="kpi-info">
-            <span class="kpi-label">Wolkenbasis (LCL)</span>
-            <span class="kpi-value highlight-cyan">${lclAlt} m</span>
-            <span class="kpi-sub">${lclAgl} m über Grund</span>
-          </div>
+          <button class="emagram-expand-btn" title="Vollbild">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <polyline points="9 21 3 21 3 15"></polyline>
+              <line x1="21" y1="3" x2="14" y2="10"></line>
+              <line x1="3" y1="21" x2="10" y2="14"></line>
+            </svg>
+          </button>
         </div>
 
-        <div class="sounding-kpi-card">
-          <span class="kpi-icon">🔥</span>
-          <div class="kpi-info">
-            <span class="kpi-label">Auslösetemperatur</span>
-            <span class="kpi-value highlight-orange">${trigT} °C</span>
-            <span class="kpi-sub">${surfaceT >= trigT ? '✅ Ausgelöst (Aktiv)' : '⏳ Noch nicht erreicht'}</span>
-          </div>
-        </div>
+        <!-- SVG Emagram Canvas -->
+        <div class="emagram-chart-container">
+          <svg viewBox="0 0 ${svgW} ${svgH}" class="emagram-svg">
+            <!-- Background Isobars & Grid -->
+            <g class="grid-layer">
+              ${isobarsSvg}
+              ${isothermsSvg}
+              ${altGridLines}
+            </g>
 
-        <div class="sounding-kpi-card">
-          <span class="kpi-icon">🦅</span>
-          <div class="kpi-info">
-            <span class="kpi-label">Thermik-Qualität</span>
-            <span class="kpi-value highlight-green">${climbRate} m/s</span>
-            <span class="kpi-sub">${rating}</span>
-          </div>
-        </div>
+            <!-- Column Divider between Emagram and Wind -->
+            <line x1="${padL + plotW}" y1="${padT}" x2="${padL + plotW}" y2="${padT + plotH}" stroke="var(--border-color, #CBD5E1)" stroke-width="1.5" />
 
-        <div class="sounding-kpi-card">
-          <span class="kpi-icon">🏔️</span>
-          <div class="kpi-info">
-            <span class="kpi-label">Thermikobergrenze</span>
-            <span class="kpi-value highlight-purple">${thermalCeil} m</span>
-            <span class="kpi-sub">Thermik-Nutzhöhe: ${Math.max(0, thermalCeil - st.elevation)} m</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- SVG Emagram / Skew-T Thermodynamic Chart -->
-      <div class="emagram-diagram-wrapper">
-        <div class="diagram-header-row">
-          <strong class="diagram-title">Emagramm / Vertikales Profil (Stüve/Skew-T)</strong>
-          <div class="diagram-legend-row">
-            <span class="chart-legend-item"><span class="legend-dot dot-red"></span>Temperatur T</span>
-            <span class="chart-legend-item"><span class="legend-dot dot-blue"></span>Taupunkt Td</span>
-            <span class="chart-legend-item"><span class="legend-dot dot-orange"></span>Aufstiegskurve</span>
-            <span class="chart-legend-item"><span class="legend-dot dot-cyan"></span>Wolkenbasis LCL</span>
-          </div>
-        </div>
-
-        <div class="svg-chart-container">
-          <svg viewBox="0 0 ${svgWidth} ${svgHeight}" class="emagram-svg" preserveAspectRatio="none">
-            <!-- Grid Lines: Altitudes -->
-            ${[1000, 2000, 3000, 4000, 5000].map(alt => {
-              if (alt < minAlt) return '';
-              const y = altToY(alt);
-              return `
-                <line x1="${padX}" y1="${y}" x2="${svgWidth - 20}" y2="${y}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,3" />
-                <text x="${padX - 6}" y="${y + 4}" fill="var(--text-muted)" font-size="9" text-anchor="end">${alt}m</text>
-              `;
-            }).join('')}
-
-            <!-- Grid Lines: Temperatures -->
-            ${[-20, -10, 0, 10, 20, 30].map(t => {
-              const x = tempToX(t);
-              return `
-                <line x1="${x}" y1="${padY}" x2="${x}" y2="${svgHeight - 24}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,3" />
-                <text x="${x}" y="${svgHeight - 10}" fill="var(--text-muted)" font-size="9" text-anchor="middle">${t}°C</text>
-              `;
-            }).join('')}
-
-            <!-- 0°C Isotherm Highlight -->
-            <line 
-              x1="${tempToX(0)}" 
-              y1="${padY}" 
-              x2="${tempToX(0)}" 
-              y2="${svgHeight - 24}" 
-              stroke="#60A5FA" 
-              stroke-width="1.2" 
-              stroke-dasharray="4,4" 
-            />
-
-            <!-- Inversion Bands Shading -->
-            ${inversions.map(inv => {
-              const y1 = altToY(inv.top_alt);
-              const y2 = altToY(inv.bottom_alt);
-              const h = Math.max(4, y2 - y1);
-              return `
-                <rect x="${padX}" y="${y1}" width="${plotW}" height="${h}" fill="rgba(168, 85, 247, 0.18)" />
-                <text x="${svgWidth - 24}" y="${y1 + h / 2 + 3}" fill="#C084FC" font-size="8.5" text-anchor="end">Inversion +${inv.strength_k}K</text>
-              `;
-            }).join('')}
-
-            <!-- LCL Cloud Base Dashed Cyan Line -->
-            ${lclAlt <= maxAlt ? `
-              <line x1="${padX}" y1="${lclY}" x2="${svgWidth - 20}" y2="${lclY}" stroke="#22D3EE" stroke-width="1.8" stroke-dasharray="5,3" />
-              <text x="${padX + 8}" y="${lclY - 4}" fill="#22D3EE" font-size="9" font-weight="700">Kumulusbasis ${lclAlt}m</text>
+            <!-- Dewpoint Curve (Dashed Blue) -->
+            ${dewPolyline ? `
+              <polyline 
+                points="${dewPolyline}" 
+                fill="none" 
+                stroke="#0284C7" 
+                stroke-width="2.2" 
+                stroke-dasharray="4,4" 
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             ` : ''}
 
-            <!-- Plot Dewpoint Curve Td(z) -->
-            ${tdPoints ? `<polyline fill="none" stroke="#3B82F6" stroke-width="2.2" stroke-linecap="round" points="${tdPoints}" />` : ''}
+            <!-- Temperature Curve (Lapse-Rate Colored Segments) -->
+            <g class="temp-curve-layer">
+              ${tempSegmentsSvg}
+            </g>
 
-            <!-- Plot Temperature Curve T(z) -->
-            ${tPoints ? `<polyline fill="none" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round" points="${tPoints}" />` : ''}
+            <!-- Wind Speed Profile Curve (Solid Blue) -->
+            ${windPolyline ? `
+              <polyline 
+                points="${windPolyline}" 
+                fill="none" 
+                stroke="#0284C7" 
+                stroke-width="2.2" 
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            ` : ''}
 
-            <!-- Plot Parcel Ascent Curve -->
-            ${parcelPoints ? `<polyline fill="none" stroke="#F59E0B" stroke-width="2" stroke-dasharray="4,2" points="${parcelPoints}" />` : ''}
+            <!-- Wind Barbs -->
+            <g class="wind-barbs-layer">
+              ${windBarbsSvg}
+            </g>
+
+            <!-- Axis Units & Labels -->
+            <text x="${padL - 10}" y="${padT + plotH + 20}" fill="#64748B" font-size="12" font-weight="700">hPa</text>
+            <rect x="${padL + 70}" y="${padT + plotH + 8}" width="140" height="22" rx="11" fill="var(--bg-secondary, #F1F5F9)" />
+            <text x="${padL + 140}" y="${padT + plotH + 23}" fill="#64748B" font-size="11" font-weight="700" text-anchor="middle">Temperature (°C)</text>
+
+            <rect x="${padL + plotW + 10}" y="${padT + plotH + 8}" width="105" height="22" rx="11" fill="var(--bg-secondary, #F1F5F9)" />
+            <text x="${padL + plotW + 62}" y="${padT + plotH + 23}" fill="#64748B" font-size="11" font-weight="700" text-anchor="middle">Wind (km/h)</text>
+            
+            <text x="${padL + plotW + 35}" y="${padT + plotH + 42}" fill="#94A3B8" font-size="10" font-weight="600" text-anchor="middle">15</text>
+            <text x="${padL + plotW + 62}" y="${padT + plotH + 42}" fill="#94A3B8" font-size="10" font-weight="600" text-anchor="middle">30</text>
+            <text x="${padL + plotW + 90}" y="${padT + plotH + 42}" fill="#94A3B8" font-size="10" font-weight="600" text-anchor="middle">45</text>
           </svg>
         </div>
-      </div>
 
-      <!-- Winds Aloft Table (Höhenwinde) -->
-      <div class="winds-aloft-box">
-        <h4 class="winds-title">💨 Höhenwindprofil (Winds Aloft)</h4>
-        <div class="winds-aloft-pills">
-          ${levels.filter(l => [1000, 1500, 2000, 2500, 3000, 4000].includes(l.alt) || l.alt === st.elevation).map(l => `
-            <div class="wind-level-badge">
-              <span class="wind-alt">${l.alt}m</span>
-              <span class="wind-val">${l.wind_speed} km/h</span>
-              <span class="wind-dir" style="transform: rotate(${l.wind_dir}deg);">↓</span>
-              <span class="wind-deg">${l.wind_dir}°</span>
-            </div>
-          `).join('')}
+        <!-- Lapse Rate Scale Legend (Matching Android Screenshot) -->
+        <div class="emagram-lapse-legend">
+          <div class="emagram-lapse-bar"></div>
+          <div class="emagram-lapse-ticks">
+            <span>-1.0</span>
+            <span>-0.8</span>
+            <span>-0.6</span>
+            <span>-0.3</span>
+            <span>0.0</span>
+          </div>
+          <div class="emagram-lapse-unit">°C / 100 m</div>
+        </div>
+
+        <!-- Bottom Timeline Slider Panel -->
+        <div class="emagram-timeline-panel">
+          <div class="emagram-timeline-controls">
+            <button id="emagram-prev-btn" class="emagram-stepper-btn" title="Vorherige Stunde">
+              &lt;&lt;
+            </button>
+            <button id="emagram-play-btn" class="player-btn primary ${this.isPlayingEmagram ? 'playing' : ''}" style="width:34px; height:34px;" title="Abspielen">
+              ${this.isPlayingEmagram ? `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16"></rect>
+                  <rect x="14" y="4" width="4" height="16"></rect>
+                </svg>
+              ` : `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              `}
+            </button>
+            <button id="emagram-next-btn" class="emagram-stepper-btn" title="Nächste Stunde">
+              &gt;&gt;
+            </button>
+            
+            <input 
+              type="range" 
+              id="emagram-time-slider" 
+              class="emagram-time-slider" 
+              min="0" 
+              max="${Math.max(0, totalSteps - 1)}" 
+              value="${this.activeEmagramTimeIndex}" 
+              step="1" 
+            />
+          </div>
+
+          <div class="emagram-timeline-bottom-row">
+            <span class="emagram-date-label">${dateLabel}</span>
+            <span style="font-size:0.8rem; font-weight:700; color:var(--shv-blue);">
+              Prognoseschritt ${this.activeEmagramTimeIndex + 1} / ${totalSteps}
+            </span>
+          </div>
         </div>
       </div>
     `;
   }
 
-  updateSoundingCard() {
-    const cardContainer = this.container.querySelector('#emagram-detail-container');
-    if (cardContainer) {
-      cardContainer.innerHTML = this.renderSoundingDetailContent();
-      this.attachSoundingCardEvents();
+  updateEmagramDetailDOM() {
+    const container = this.container.querySelector('#emagram-detail-container');
+    if (!container) return;
+    container.innerHTML = this.renderEmagramAndroidCard();
+    this.attachEmagramCardEvents();
+  }
+
+  attachEmagramCardEvents() {
+    const slider = this.container.querySelector('#emagram-time-slider');
+    const prevBtn = this.container.querySelector('#emagram-prev-btn');
+    const nextBtn = this.container.querySelector('#emagram-next-btn');
+    const playBtn = this.container.querySelector('#emagram-play-btn');
+    const backBtn = this.container.querySelector('#btn-emagram-back');
+
+    if (slider) {
+      slider.addEventListener('input', (e) => {
+        this.activeEmagramTimeIndex = parseInt(e.target.value, 10);
+        this.updateEmagramDetailDOM();
+      });
+    }
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        this.stepEmagramTime(-1);
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        this.stepEmagramTime(1);
+      });
+    }
+
+    if (playBtn) {
+      playBtn.addEventListener('click', () => {
+        this.toggleEmagramPlay();
+      });
+    }
+
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        const mapEl = document.getElementById('emagram-map');
+        if (mapEl) {
+          mapEl.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    }
+  }
+
+  stepEmagramTime(delta) {
+    const totalSteps = (this.emagramForecastData?.timeSteps || []).length || 1;
+    this.activeEmagramTimeIndex = (this.activeEmagramTimeIndex + delta + totalSteps) % totalSteps;
+    this.updateEmagramDetailDOM();
+  }
+
+  toggleEmagramPlay() {
+    if (this.isPlayingEmagram) {
+      this.stopEmagramPlayer();
+    } else {
+      this.startEmagramPlayer();
+    }
+    this.updateEmagramDetailDOM();
+  }
+
+  startEmagramPlayer() {
+    this.isPlayingEmagram = true;
+    this.emagramPlayTimer = setInterval(() => {
+      this.stepEmagramTime(1);
+    }, 800);
+  }
+
+  stopEmagramPlayer() {
+    this.isPlayingEmagram = false;
+    if (this.emagramPlayTimer) {
+      clearInterval(this.emagramPlayTimer);
+      this.emagramPlayTimer = null;
     }
   }
 
   // =========================================================================
-  // 4. ISOBARENKARTE SECTION
+  // 4. ISOBAREN SECTION
   // =========================================================================
 
   renderIsobarenSection(isobarenUrl) {
@@ -747,135 +1069,21 @@ export class ForecastView {
       <div class="forecast-content-card">
         <div class="section-header-row">
           <div>
-            <span class="badge-tag">Synoptik</span>
-            <h2 class="section-heading">Offizielle Isobarenkarte</h2>
-            <p class="section-sub">Bodennahres Druckfeld & Frontenverlauf über Mitteleuropa (MeteoSchweiz & DWD)</p>
+            <span class="badge-tag">MeteoSchweiz / DWD</span>
+            <h2 class="section-heading">Bodendruck & Frontensynoptik (Isobaren)</h2>
+            <p class="section-sub">Offizielle mitteleuropäische Frontenanalyse mit Hoch- und Tiefdruckzentren</p>
           </div>
-          <a href="${isobarenUrl}" target="_blank" rel="noopener" class="btn-secondary" style="font-size: 0.8rem; padding: 6px 12px; text-decoration: none;">
-            Vollbild ↗
-          </a>
         </div>
 
-        <div class="isobaren-container">
-          <img src="${isobarenUrl}" alt="Offizielle Isobarenkarte" class="isobaren-svg" loading="lazy" />
+        <div class="isobaren-map-container">
+          <img src="${isobarenUrl}" alt="Isobarenkarte Schweiz & Europa" class="isobaren-img" loading="eager" />
         </div>
       </div>
     `;
   }
 
   // =========================================================================
-  // EVENT LISTENERS & INTERACTION LOGIC
-  // =========================================================================
-
-  attachEvents() {
-    // 1. Top Section Switcher
-    this.container.querySelectorAll('.forecast-tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.stopOutlookPlayer();
-        this.activeSection = btn.getAttribute('data-section');
-        this.render();
-      });
-    });
-
-    // 2. Text Category Switcher
-    this.container.querySelectorAll('.text-category-switcher-row .category-pill').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const cat = btn.getAttribute('data-cat');
-        const type = btn.getAttribute('data-type');
-        if (cat) {
-          this.activeTextCategory = cat;
-          this.render();
-        } else if (type) {
-          this.activeOutlookType = type;
-          this.activeOutlookIndex = 0;
-          this.render();
-        }
-      });
-    });
-
-    // 3. Text Region Switcher
-    this.container.querySelectorAll('.region-pill').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.activeRegion = btn.getAttribute('data-region');
-        this.render();
-      });
-    });
-
-    // 4. Outlooks Player Events
-    if (this.activeSection === 'outlooks') {
-      const slider = this.container.querySelector('#outlook-slider');
-      const prevBtn = this.container.querySelector('#outlook-prev-btn');
-      const nextBtn = this.container.querySelector('#outlook-next-btn');
-      const playBtn = this.container.querySelector('#outlook-play-btn');
-
-      if (slider) {
-        slider.addEventListener('input', (e) => {
-          this.activeOutlookIndex = parseInt(e.target.value, 10);
-          this.render();
-        });
-      }
-
-      if (prevBtn) {
-        prevBtn.addEventListener('click', () => {
-          this.stepOutlook(-1);
-        });
-      }
-
-      if (nextBtn) {
-        nextBtn.addEventListener('click', () => {
-          this.stepOutlook(1);
-        });
-      }
-
-      if (playBtn) {
-        playBtn.addEventListener('click', () => {
-          this.toggleOutlookPlay();
-        });
-      }
-    }
-
-    // 5. Emagram Search & Quick Station Selection
-    if (this.activeSection === 'emagram') {
-      const searchInput = this.container.querySelector('#emagram-station-search');
-      if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-          this.searchQuery = e.target.value.toLowerCase().trim();
-          this.filterEmagramMarkers();
-        });
-      }
-
-      this.container.querySelectorAll('.popular-station-pill').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const stName = btn.getAttribute('data-station');
-          const st = this.stations.find(s => s.name === stName);
-          if (st) {
-            this.selectStation(st);
-          }
-        });
-      });
-
-      this.attachSoundingCardEvents();
-    }
-  }
-
-  attachSoundingCardEvents() {
-    const tempSlider = this.container.querySelector('#emagram-temp-slider');
-    if (tempSlider) {
-      tempSlider.addEventListener('input', (e) => {
-        const val = parseFloat(e.target.value);
-        const valLabel = this.container.querySelector('#surface-temp-val');
-        if (valLabel) valLabel.textContent = `${val.toFixed(1)} °C`;
-      });
-
-      tempSlider.addEventListener('change', (e) => {
-        const val = parseFloat(e.target.value);
-        this.loadSounding(this.selectedStation, val);
-      });
-    }
-  }
-
-  // =========================================================================
-  // LEAFLET EMAGRAM MAP LOGIC
+  // LEAFLET MAP LOGIC (Free & Keyless Swisstopo Pixelkarte)
   // =========================================================================
 
   initEmagramMap() {
@@ -895,9 +1103,10 @@ export class ForecastView {
       attributionControl: false,
     });
 
-    // Basemap (Clean CartoDB Positron style)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    // Basemap: Swisstopo Pixelkarte (Keyless, High Resolution) with OSM fallback
+    L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg', {
       maxZoom: 18,
+      attribution: '© swisstopo',
     }).addTo(this.emagramMap);
 
     this.stationMarkersLayer = L.layerGroup().addTo(this.emagramMap);
@@ -955,8 +1164,7 @@ export class ForecastView {
 
   selectStation(st) {
     this.selectedStation = st;
-    this.simulatedSurfaceTemp = null;
-    this.loadSounding(st);
+    this.loadEmagramForecast(st);
     this.renderEmagramMarkers();
 
     if (this.emagramMap) {
@@ -971,46 +1179,110 @@ export class ForecastView {
         btn.classList.remove('active');
       }
     });
-  }
 
-  // =========================================================================
-  // OUTLOOKS ANIMATION LOGIC
-  // =========================================================================
-
-  stepOutlook(delta) {
-    const currentDataSet = this.outlooksData?.data?.find(d => d.type === this.activeOutlookType);
-    const totalFiles = (currentDataSet && currentDataSet.files && currentDataSet.files.length) || 1;
-    this.activeOutlookIndex = (this.activeOutlookIndex + delta + totalFiles) % totalFiles;
-    this.render();
-  }
-
-  toggleOutlookPlay() {
-    if (this.isPlayingOutlooks) {
-      this.stopOutlookPlayer();
-    } else {
-      this.startOutlookPlayer();
-    }
-    this.render();
-  }
-
-  startOutlookPlayer() {
-    this.isPlayingOutlooks = true;
-    this.outlookPlayTimer = setInterval(() => {
-      this.stepOutlook(1);
-    }, 1500);
-  }
-
-  stopOutlookPlayer() {
-    this.isPlayingOutlooks = false;
-    if (this.outlookPlayTimer) {
-      clearInterval(this.outlookPlayTimer);
-      this.outlookPlayTimer = null;
+    // Scroll smoothly to detail frame
+    const detailEl = document.getElementById('emagram-detail-container');
+    if (detailEl) {
+      detailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }
 
   // =========================================================================
-  // UTILS
+  // EVENT ATTACHMENT
   // =========================================================================
+
+  attachEvents() {
+    // 1. Top Section Switcher Tabs
+    this.container.querySelectorAll('.forecast-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const section = btn.getAttribute('data-section');
+        if (section !== this.activeSection) {
+          this.activeSection = section;
+          this.render();
+        }
+      });
+    });
+
+    // 2. Text Category Switcher
+    this.container.querySelectorAll('.text-category-switcher-row .category-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cat = btn.getAttribute('data-cat');
+        const outlookType = btn.getAttribute('data-type');
+        if (cat) {
+          this.activeTextCategory = cat;
+          this.render();
+        } else if (outlookType) {
+          this.activeOutlookType = outlookType;
+          this.activeOutlookIndex = 0;
+          this.render();
+        }
+      });
+    });
+
+    // 3. Regional Sub-Pills
+    this.container.querySelectorAll('.region-pills-row .region-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.activeRegion = btn.getAttribute('data-region');
+        this.render();
+      });
+    });
+
+    // 4. Outlooks Player Events
+    if (this.activeSection === 'outlooks') {
+      const slider = this.container.querySelector('#outlook-slider');
+      const prevBtn = this.container.querySelector('#outlook-prev-btn');
+      const nextBtn = this.container.querySelector('#outlook-next-btn');
+      const playBtn = this.container.querySelector('#outlook-play-btn');
+
+      if (slider) {
+        slider.addEventListener('input', (e) => {
+          this.activeOutlookIndex = parseInt(e.target.value, 10);
+          this.updateOutlookDOM();
+        });
+      }
+
+      if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+          this.stepOutlook(-1);
+        });
+      }
+
+      if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+          this.stepOutlook(1);
+        });
+      }
+
+      if (playBtn) {
+        playBtn.addEventListener('click', () => {
+          this.toggleOutlookPlay();
+        });
+      }
+    }
+
+    // 5. Emagram Search & Quick Station Selection
+    if (this.activeSection === 'emagram') {
+      const searchInput = this.container.querySelector('#emagram-station-search');
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          this.searchQuery = e.target.value.toLowerCase().trim();
+          this.filterEmagramMarkers();
+        });
+      }
+
+      this.container.querySelectorAll('.popular-station-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const stName = btn.getAttribute('data-station');
+          const st = this.stations.find(s => s.name === stName);
+          if (st) {
+            this.selectStation(st);
+          }
+        });
+      });
+
+      this.attachEmagramCardEvents();
+    }
+  }
 
   sanitizeHtml(rawHtml) {
     if (!rawHtml) return '';

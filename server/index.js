@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { startAuth, exchangeCode, getSession, logoutSession } from './auth.js';
+import { getEmagramForecast } from './emagram_provider.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -508,19 +509,20 @@ app.get('/api/meteo/outlooks', async (req, res) => {
   try {
     const url = 'https://static-prod.ubmeteo.io/v1/animation/switzerland/days_overview.json';
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 10000);
     const resp = await fetch(url, { signal: controller.signal });
     clearTimeout(timeout);
 
     if (resp.ok) {
       const data = await resp.json();
-      cache.outlooks = { data, timestamp: now, ttl: 15 * 60 * 1000 };
+      cache.outlooks = { data, timestamp: now, ttl: 30 * 60 * 1000 };
       return res.json(data);
     }
     throw new Error(`Upstream days_overview returned ${resp.status}`);
   } catch (err) {
     console.error('[Server] Days overview error:', err.message);
     if (cache.outlooks.data) {
+      // Return stale cache if available to prevent red error box
       return res.json(cache.outlooks.data);
     }
     return res.status(503).json({ error: 'Aussichten vorübergehend nicht erreichbar' });
@@ -539,6 +541,67 @@ app.get('/api/meteo/previtemps/stations', (req, res) => {
   } catch (err) {
     console.error('[Server] Previtemps stations error:', err.message);
     return res.status(500).json({ error: 'Failed to load previtemps stations' });
+  }
+});
+
+// 9b. Official MeteoSwiss ICON-CH1 Multi-timestep Emagram Forecast
+app.get('/api/meteo/previtemps/forecast', async (req, res) => {
+  try {
+    const stationName = req.query.name || 'Interlaken';
+    let lat = req.query.lat ? parseFloat(req.query.lat) : null;
+    let lon = req.query.lon ? parseFloat(req.query.lon) : null;
+
+    if (lat === null || lon === null || isNaN(lat) || isNaN(lon)) {
+      const stationsPath = path.join(projectRoot, 'src', 'data', 'previtemps_stations.json');
+      if (fs.existsSync(stationsPath)) {
+        const list = JSON.parse(fs.readFileSync(stationsPath, 'utf8'));
+        const found = list.find(s => s.name.toLowerCase() === stationName.toLowerCase());
+        if (found) {
+          lat = found.lat;
+          lon = found.lon;
+        }
+      }
+    }
+
+    if (lat === null || lon === null) {
+      lat = 46.686; // Interlaken default
+      lon = 7.863;
+    }
+
+    const data = await getEmagramForecast(stationName, lat, lon);
+    return res.json(data);
+  } catch (err) {
+    console.error('[Server] Emagram forecast error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/meteo/previtemps/forecast/:stationName', async (req, res) => {
+  try {
+    const stationName = decodeURIComponent(req.params.stationName);
+    let lat = null;
+    let lon = null;
+
+    const stationsPath = path.join(projectRoot, 'src', 'data', 'previtemps_stations.json');
+    if (fs.existsSync(stationsPath)) {
+      const list = JSON.parse(fs.readFileSync(stationsPath, 'utf8'));
+      const found = list.find(s => s.name.toLowerCase() === stationName.toLowerCase());
+      if (found) {
+        lat = found.lat;
+        lon = found.lon;
+      }
+    }
+
+    if (lat === null || lon === null) {
+      lat = 46.686;
+      lon = 7.863;
+    }
+
+    const data = await getEmagramForecast(stationName, lat, lon);
+    return res.json(data);
+  } catch (err) {
+    console.error('[Server] Emagram forecast error:', err.message);
+    return res.status(500).json({ error: err.message });
   }
 });
 

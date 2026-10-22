@@ -155,6 +155,21 @@ export class ShvApi {
     return [];
   }
 
+  static async getEmagramForecast(stationName, lat = null, lon = null) {
+    try {
+      let url = `/api/meteo/previtemps/forecast/${encodeURIComponent(stationName)}`;
+      if (lat !== null && lon !== null) {
+        url += `?lat=${lat}&lon=${lon}`;
+      }
+      const resp = await fetch(url);
+      if (resp.ok) return await resp.json();
+      console.error('[ShvApi.getEmagramForecast] HTTP error:', resp.status, resp.statusText);
+    } catch (e) {
+      console.error('[ShvApi.getEmagramForecast] Network error:', e);
+    }
+    return null;
+  }
+
   static async getPrevitempsSounding(stationName, surfaceTemp, surfaceDew) {
     try {
       let url = `/api/meteo/previtemps/sounding/${encodeURIComponent(stationName)}`;
