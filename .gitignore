@@ -3,3 +3,4 @@ dist/
 .DS_Store
 apk_analysis/
 *.log
+server/cache/

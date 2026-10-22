@@ -1,10 +1,10 @@
 import { store } from '../state.js';
 
 export function renderBottomSheet(container) {
-  const { selectedSite, selectedStation, selectedWebcam } = store.state;
+  const { selectedSite, selectedStation, selectedWebcam, selectedObstacle } = store.state;
   const t = store.t;
 
-  if (!selectedSite && !selectedStation && !selectedWebcam) {
+  if (!selectedSite && !selectedStation && !selectedWebcam && !selectedObstacle) {
     container.innerHTML = '';
     container.classList.add('hidden');
     return;
@@ -324,6 +324,143 @@ export function renderBottomSheet(container) {
       </div>
     `;
   }
+  // 4. BAZL AVIATION OBSTACLE DETAILS
+  else if (selectedObstacle) {
+    const p = selectedObstacle.properties || selectedObstacle;
+    const center = getSiteCenterLatLng(selectedObstacle) || [46.8, 8.2];
+    const [lat, lng] = center;
+
+    const OBSTACLE_TYPE_LABELS = {
+      TRANSMISSION_LINE: 'Freileitung / Stromkabel',
+      CABLE_CAR: 'Luftseilbahn / Seilbahn',
+      CATENARY: 'Spannseil / Catenary',
+      POLE: 'Mast / Freileitungsmast',
+      CRANE: 'Baukran',
+      BUILDING: 'Gebäude / Turm',
+      VEGETATION: 'Baum / Waldhindernis',
+      WINDMILL: 'Windenergieanlage',
+      STACK: 'Kamin / Schornstein',
+      BRIDGE: 'Brücke / Hängebrücke',
+    };
+
+    const typeTitle = OBSTACLE_TYPE_LABELS[p.obstacleType] || p.obstacleType || 'Luftfahrthindernis';
+    const isLine = p.geometryType === 'LineString' || p.obstacleType === 'TRANSMISSION_LINE' || p.obstacleType === 'CABLE_CAR';
+    const iconName = p.styleId || (isLine ? 'ms_pole' : 'red_circle');
+    const iconUrl = `/assets/obstacles/${iconName}.svg`;
+
+    container.innerHTML = `
+      <div class="sheet-scrim" id="sheet-scrim"></div>
+      <div class="sheet-content">
+        <div class="sheet-drag-handle"></div>
+
+        <div class="sheet-header">
+          <div class="sheet-title-group">
+            <div class="sheet-badges-row">
+              <span class="sheet-badge" style="background: #CC0000; color: #FFFFFF; font-weight: 700;">
+                ⚠️ Luftfahrthindernis BAZL
+              </span>
+              ${p.airport ? `<span class="sheet-badge badge-launch">Flugplatz ${escapeHtml(p.airport)}</span>` : ''}
+              ${p.marking && p.marking !== 'NONE' ? `<span class="sheet-badge badge-status-closed">Markiert</span>` : ''}
+              ${p.lighting && p.lighting !== 'NONE' ? `<span class="sheet-badge badge-status-open">Beleuchtet</span>` : ''}
+            </div>
+            <h2 class="sheet-title" style="display: flex; align-items: center; gap: 8px;">
+              <img src="${iconUrl}" onerror="this.style.display='none'" alt="" style="width: 24px; height: 24px; object-fit: contain;" />
+              <span>${escapeHtml(typeTitle)}</span>
+            </h2>
+            <div class="sheet-meta">
+              ${p.topElevationAmsl ? `
+                <span class="meta-item">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>
+                  ${p.topElevationAmsl} m ü. M. (AMSL)
+                </span>
+              ` : ''}
+              <span class="meta-item">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E
+              </span>
+            </div>
+          </div>
+          <button class="sheet-close" id="sheet-close-btn">&times;</button>
+        </div>
+
+        <div class="sheet-body">
+          <div class="station-metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));">
+            ${p.maxHeightAgl ? `
+              <div class="metric-card" style="border-left: 3px solid #CC0000;">
+                <span class="metric-lbl">Max. Höhe (AGL)</span>
+                <span class="metric-val" style="color: #CC0000;">${p.maxHeightAgl} m</span>
+                <span class="metric-sub">Über Grund</span>
+              </div>
+            ` : ''}
+            ${p.topElevationAmsl ? `
+              <div class="metric-card">
+                <span class="metric-lbl">Max. Höhe (AMSL)</span>
+                <span class="metric-val">${p.topElevationAmsl} m</span>
+                <span class="metric-sub">Über Meer</span>
+              </div>
+            ` : ''}
+            ${p.totalLength ? `
+              <div class="metric-card">
+                <span class="metric-lbl">Gesamtlänge</span>
+                <span class="metric-val">${p.totalLength} m</span>
+              </div>
+            ` : ''}
+            ${p.radius ? `
+              <div class="metric-card">
+                <span class="metric-lbl">Radius</span>
+                <span class="metric-val">${p.radius} m</span>
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- Technical Attributes -->
+          <div class="sheet-section" style="margin-top: 14px; background: rgba(255, 255, 255, 0.04); border-radius: 12px; padding: 12px 14px;">
+            <div style="display: grid; grid-template-columns: 140px 1fr; gap: 8px; font-size: 0.85rem; line-height: 1.5;">
+              <span style="color: var(--text-secondary);">Typ:</span>
+              <span style="font-weight: 600;">${escapeHtml(p.obstacleType || '-')}</span>
+
+              ${p.sourceId ? `
+                <span style="color: var(--text-secondary);">BAZL-ID:</span>
+                <span style="font-family: monospace; font-size: 0.8rem;">${escapeHtml(p.sourceId)}</span>
+              ` : ''}
+
+              <span style="color: var(--text-secondary);">Markierung:</span>
+              <span>${p.marking === 'MARKED' ? '🔴 Markiert' : 'Keine'}</span>
+
+              <span style="color: var(--text-secondary);">Beleuchtung:</span>
+              <span>${p.lighting && p.lighting !== 'NONE' ? `💡 ${escapeHtml(p.lighting)}` : 'Keine'}</span>
+
+              ${p.effectiveDate ? `
+                <span style="color: var(--text-secondary);">In Kraft seit:</span>
+                <span>${escapeHtml(p.effectiveDate)}</span>
+              ` : ''}
+
+              ${p.lastUpdate ? `
+                <span style="color: var(--text-secondary);">Aktualisiert:</span>
+                <span>${escapeHtml(p.lastUpdate)}</span>
+              ` : ''}
+            </div>
+
+            ${p.sanctionText ? `
+              <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color); font-size: 0.82rem; color: var(--text-secondary);">
+                <strong>Verfügung:</strong> ${escapeHtml(p.sanctionText)}
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="sheet-actions" style="margin-top: 14px;">
+            <a href="https://maps.apple.com/?daddr=${lat},${lng}" target="_blank" class="btn-action btn-nav">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+              ${t.map.openInMaps}
+            </a>
+            <a href="https://www.skybriefing.com/de/dabs" target="_blank" rel="noopener" class="btn-action" style="background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-primary); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; padding: 10px 14px;">
+              <span>DABS Konsultation ↗</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
   // Event handlers
   const closeBtn = container.querySelector('#sheet-close-btn');
@@ -333,6 +470,7 @@ export function renderBottomSheet(container) {
     store.selectSite(null);
     store.selectStation(null);
     store.selectWebcam(null);
+    store.selectObstacle(null);
   };
 
   if (closeBtn) closeBtn.addEventListener('click', closeSheet);

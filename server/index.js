@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { startAuth, exchangeCode, getSession, logoutSession } from './auth.js';
 import { getEmagramForecast } from './emagram_provider.js';
+import { queryObstacles, getVectorTile } from './obstacles_provider.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -697,6 +698,41 @@ app.get('/api/meteo/previtemps/sounding/:stationName', (req, res) => {
     py.stdin.end();
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// BAZL Obstacles (Luftfahrthindernisse)
+app.get('/api/obstacles', async (req, res) => {
+  try {
+    const { minLon, minLat, maxLon, maxLat, zoom } = req.query;
+    if (!minLon || !minLat || !maxLon || !maxLat) {
+      return res.status(400).json({ error: 'Missing bbox query params: minLon, minLat, maxLon, maxLat' });
+    }
+    const fc = await queryObstacles({
+      minLon: parseFloat(minLon),
+      minLat: parseFloat(minLat),
+      maxLon: parseFloat(maxLon),
+      maxLat: parseFloat(maxLat),
+      zoom: parseFloat(zoom) || 12
+    });
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json(fc);
+  } catch (err) {
+    console.error('[Server] /api/obstacles error:', err.message);
+    res.status(500).json({ error: 'Failed to query BAZL obstacles' });
+  }
+});
+
+app.get('/api/obstacles/tiles/bazl/:z/:x/:y.pbf', async (req, res) => {
+  try {
+    const { z, x, y } = req.params;
+    const buf = await getVectorTile(z, x, y);
+    res.set('Content-Type', 'application/x-protobuf');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(buf);
+  } catch (err) {
+    console.error('[Server] /api/obstacles/tiles error:', err.message);
+    res.status(502).json({ error: 'Failed to fetch BAZL vector tile' });
   }
 });
 

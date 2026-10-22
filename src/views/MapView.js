@@ -26,6 +26,12 @@ export class MapView {
       },
       onEachFeature: (feature, layer) => this.bindWildschutzEvents(feature, layer),
     });
+    this.obstaclesLayer = L.geoJSON(null, {
+      pointToLayer: (feature, latlng) => this.renderObstaclePoint(feature, latlng),
+      style: (feature) => this.getObstacleStyle(feature),
+      onEachFeature: (feature, layer) => this.bindObstacleEvents(feature, layer),
+    });
+    this.obstacleDebounce = null;
     this.stationsLayer = L.layerGroup();
     this.webcamsLayer = L.layerGroup();
     this.foehnLayer = L.layerGroup();
@@ -62,7 +68,7 @@ export class MapView {
 
   renderLayout() {
     const t = store.t;
-    const { layers, baseMap, windFilter, searchQuery, meteoMode } = store.state;
+    const { layers, baseMap, windFilter, searchQuery, meteoMode, mapCategory = 'AIRSPACE' } = store.state;
 
     const windDirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
@@ -99,7 +105,7 @@ export class MapView {
         <!-- 2. Right Floating Action Button (FAB) Stack -->
         <div class="map-fab-column">
           <!-- Single Unified Map Controls FAB -->
-          <button id="btn-fab-layers" class="map-fab" title="Karten-Optionen, Ebenen & Wetter">
+          <button id="btn-fab-layers" class="map-fab" title="Karten-Optionen & Ebenen ein-/ausblenden">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
               <polyline points="2 17 12 22 22 17"></polyline>
@@ -117,120 +123,159 @@ export class MapView {
           </button>
         </div>
 
-        <!-- 3. Single Unified Map Controls Drawer (All Controls in One Single Box) -->
-        <div id="map-layers-drawer" class="map-drawer hidden">
-          <div class="drawer-header">
-            <h3>Karten-Optionen & Ebenen</h3>
-            <button class="drawer-close" id="btn-close-layers">&times;</button>
+        <!-- 3. Bottom Controls Stack (Directly matching Screenshot_20261022-164845.png) -->
+        <div class="map-bottom-stack">
+          <div class="map-bottom-floating-row">
+            <button id="btn-floating-info" class="map-floating-info" title="Information, Legende & Quellen">
+              <span>i</span>
+            </button>
+            <a id="btn-floating-dabs" href="https://www.skybriefing.com/de/dabs" target="_blank" rel="noopener" class="map-floating-dabs ${mapCategory === 'AIRSPACE' ? '' : 'hidden'}" title="Skybriefing DABS Daily Airspace Bulletin">
+              <span>DABS</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </a>
           </div>
+
+          <div id="map-layers-drawer" class="map-drawer map-bottom-drawer">
+            <div class="drawer-drag-handle"></div>
+
+            <!-- Segmented Category Tabs -->
+            <div class="drawer-category-bar">
+              <button data-map-category="METEO" class="drawer-cat-pill ${mapCategory === 'METEO' ? 'active' : ''}">Weather</button>
+              <button data-map-category="AIRSPACE" class="drawer-cat-pill ${mapCategory === 'AIRSPACE' ? 'active' : ''}">Airspace</button>
+              <button data-map-category="FLYING_AREAS" class="drawer-cat-pill ${mapCategory === 'FLYING_AREAS' ? 'active' : ''}">Flying sites</button>
+            </div>
+
           <div class="drawer-body">
-            <!-- 3.1 Live-Wetter Overlays -->
-            <div class="drawer-section">
-              <h4 class="drawer-subtitle">Live-Wetter (Meteo-Overlays)</h4>
-              <div class="drawer-meteo-pills-row">
-                <button data-meteo-mode="WIND" class="meteo-pill ${meteoMode === 'WIND' ? 'active' : ''}" title="Windwerte & Böen an Stationen">
-                  <span class="pill-icon">🍃</span>
-                  <span>Wind & Böen</span>
-                </button>
-                <button data-meteo-mode="TEMPERATURE" class="meteo-pill ${meteoMode === 'TEMPERATURE' ? 'active' : ''}" title="Temperatur-Overlay an Stationen">
-                  <span class="pill-icon">🌡️</span>
-                  <span>Temperatur</span>
-                </button>
-                <button data-meteo-mode="PRESSURE_DIFFERENCE" class="meteo-pill ${meteoMode === 'PRESSURE_DIFFERENCE' ? 'active' : ''}" title="Offizielle Transekte (Gotthard, Genf-Güttingen, Pilatus-Matro, Jura)">
-                  <span class="pill-icon">⚡</span>
-                  <span>Föhn / Δp</span>
-                </button>
-                <button data-meteo-mode="WEBCAM" class="meteo-pill ${meteoMode === 'WEBCAM' ? 'active' : ''}" title="Alpine Webcams mit Live-Vorschau">
-                  <span class="pill-icon">📷</span>
-                  <span>Webcams</span>
-                </button>
-                <button data-meteo-mode="NONE" class="meteo-pill pill-none ${meteoMode === 'NONE' ? 'active' : ''}" title="Meteo-Ebenen ausblenden">
-                  <span>✕ Keine Wetter-Ebene</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- 3.2 Fluggebiete & Lufträume -->
-            <div class="drawer-section">
-              <h4 class="drawer-subtitle">Fluggebiete & Lufträume</h4>
-              <div class="layer-switch-list">
-                <label class="layer-switch-item">
-                  <div class="layer-switch-label">
-                    <span class="chip-dot dot-launch"></span>
-                    <span>Startplätze (Take-offs)</span>
-                  </div>
-                  <input type="checkbox" data-layer="launches" ${layers.launches ? 'checked' : ''} />
-                  <span class="switch-toggle"></span>
-                </label>
-
-                <label class="layer-switch-item">
-                  <div class="layer-switch-label">
-                    <span class="chip-dot dot-landing"></span>
-                    <span>Landeplätze (Landings)</span>
-                  </div>
-                  <input type="checkbox" data-layer="landings" ${layers.landings ? 'checked' : ''} />
-                  <span class="switch-toggle"></span>
-                </label>
-
-                <label class="layer-switch-item">
-                  <div class="layer-switch-label">
-                    <span class="chip-dot dot-airspace"></span>
-                    <span>Luftraum (CTR, TMA, Segelflug)</span>
-                  </div>
-                  <input type="checkbox" data-layer="airspace" ${layers.airspace ? 'checked' : ''} />
-                  <span class="switch-toggle"></span>
-                </label>
-
-                <label class="layer-switch-item">
-                  <div class="layer-switch-label">
-                    <span class="chip-dot dot-wild"></span>
-                    <span>Wildruhezonen (300m AGL)</span>
-                  </div>
-                  <input type="checkbox" data-layer="wildschutz" ${layers.wildschutz ? 'checked' : ''} />
-                  <span class="switch-toggle"></span>
-                </label>
-              </div>
-            </div>
-
-            <!-- 3.3 Startplatz Windfilter (Kompass) -->
-            <div class="drawer-section">
-              <h4 class="drawer-subtitle">Startplatz-Ausrichtung (Windfilter)</h4>
-              <p class="drawer-hint">Filtert Startplätze nach passender Windrichtung:</p>
-              <div class="compass-rose-grid">
-                ${windDirs.map(d => `
-                  <button data-wind="${d}" class="compass-btn ${windFilter.includes(d) ? 'active' : ''}">
-                    ${d}
+            <!-- 3.1 Airspace & Obstacles Tab -->
+            <div class="drawer-tab-pane ${mapCategory === 'AIRSPACE' ? 'active' : 'hidden'}" data-pane="AIRSPACE">
+              <!-- Base map selection -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Base map</h4>
+                <div class="basemap-grid">
+                  <button data-base="topoLight" class="basemap-card ${baseMap === 'topoLight' ? 'active' : ''}">
+                    <img src="/assets/ic_topo_light.png" alt="Light" class="basemap-card-img" />
+                    <span>Light Base Map</span>
                   </button>
-                `).join('')}
+                  <button data-base="topoColor" class="basemap-card ${baseMap === 'topoColor' ? 'active' : ''}">
+                    <img src="/assets/ic_topo_raster.png" alt="Pixelkarte" class="basemap-card-img" />
+                    <span>Pixelkarte</span>
+                  </button>
+                  <button data-base="topoSatellite" class="basemap-card ${baseMap === 'topoSatellite' ? 'active' : ''}">
+                    <img src="/assets/ic_topo_imagery.png" alt="Luftbild" class="basemap-card-img" />
+                    <span>Luftbild</span>
+                  </button>
+                  <button data-base="topoOsm" class="basemap-card ${baseMap === 'topoOsm' ? 'active' : ''}">
+                    <div class="basemap-osm-placeholder">OSM</div>
+                    <span>OpenStreet</span>
+                  </button>
+                </div>
               </div>
-              <div id="wind-drawer-reset-wrapper" style="display: ${windFilter.length > 0 ? 'block' : 'none'}; margin-top: 8px;">
-                <button id="btn-reset-wind-filter" class="btn-secondary" style="width: 100%; font-size: 0.8rem; padding: 6px;">Filter zurücksetzen (${windFilter.join(', ')})</button>
+
+              <!-- Airspace & Obstacle toggles -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Luftraum & Hindernisse</h4>
+                <div class="layer-switch-list">
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-obstacle"></span>
+                      <span>Luftfahrthindernisse BAZL</span>
+                    </div>
+                    <input type="checkbox" data-layer="obstacles" ${layers.obstacles ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-airspace"></span>
+                      <span>Luftraum (CTR, TMA, Segelflug)</span>
+                    </div>
+                    <input type="checkbox" data-layer="airspace" ${layers.airspace ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-wild"></span>
+                      <span>Wildruhezonen & Schutzgebiete</span>
+                    </div>
+                    <input type="checkbox" data-layer="wildschutz" ${layers.wildschutz ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+                </div>
               </div>
             </div>
 
-            <!-- 3.4 Basiskarte -->
-            <div class="drawer-section">
-              <h4 class="drawer-subtitle">Basiskarte</h4>
-              <div class="basemap-grid">
-                <button data-base="topoColor" class="basemap-card ${baseMap === 'topoColor' ? 'active' : ''}">
-                  <img src="/assets/ic_topo_raster.png" alt="Topo" class="basemap-card-img" />
-                  <span>Pixelkarte</span>
-                </button>
-                <button data-base="topoSatellite" class="basemap-card ${baseMap === 'topoSatellite' ? 'active' : ''}">
-                  <img src="/assets/ic_topo_imagery.png" alt="Luftbild" class="basemap-card-img" />
-                  <span>Luftbild</span>
-                </button>
-                <button data-base="topoLight" class="basemap-card ${baseMap === 'topoLight' ? 'active' : ''}">
-                  <img src="/assets/ic_topo_light.png" alt="Grau" class="basemap-card-img" />
-                  <span>Grau</span>
-                </button>
-                <button data-base="topoOsm" class="basemap-card ${baseMap === 'topoOsm' ? 'active' : ''}">
-                  <div class="basemap-osm-placeholder">OSM</div>
-                  <span>OpenStreet</span>
-                </button>
+            <!-- 3.2 Weather Tab -->
+            <div class="drawer-tab-pane ${mapCategory === 'METEO' ? 'active' : 'hidden'}" data-pane="METEO">
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Live-Wetter (Meteo-Overlays)</h4>
+                <div class="drawer-meteo-pills-row">
+                  <button data-meteo-mode="WIND" class="meteo-pill ${meteoMode === 'WIND' ? 'active' : ''}" title="Windwerte & Böen an Stationen">
+                    <span class="pill-icon">🍃</span>
+                    <span>Wind & Böen</span>
+                  </button>
+                  <button data-meteo-mode="TEMPERATURE" class="meteo-pill ${meteoMode === 'TEMPERATURE' ? 'active' : ''}" title="Temperatur-Overlay an Stationen">
+                    <span class="pill-icon">🌡️</span>
+                    <span>Temperatur</span>
+                  </button>
+                  <button data-meteo-mode="PRESSURE_DIFFERENCE" class="meteo-pill ${meteoMode === 'PRESSURE_DIFFERENCE' ? 'active' : ''}" title="Offizielle Transekte (Gotthard, Genf-Güttingen, Pilatus-Matro, Jura)">
+                    <span class="pill-icon">⚡</span>
+                    <span>Föhn / Δp</span>
+                  </button>
+                  <button data-meteo-mode="WEBCAM" class="meteo-pill ${meteoMode === 'WEBCAM' ? 'active' : ''}" title="Alpine Webcams mit Live-Vorschau">
+                    <span class="pill-icon">📷</span>
+                    <span>Webcams</span>
+                  </button>
+                  <button data-meteo-mode="NONE" class="meteo-pill pill-none ${meteoMode === 'NONE' ? 'active' : ''}" title="Meteo-Ebenen ausblenden">
+                    <span>✕ Keine Wetter-Ebene</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3.3 Flying Sites Tab -->
+            <div class="drawer-tab-pane ${mapCategory === 'FLYING_AREAS' ? 'active' : 'hidden'}" data-pane="FLYING_AREAS">
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Fluggebiete</h4>
+                <div class="layer-switch-list">
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-launch"></span>
+                      <span>Startplätze (Take-offs)</span>
+                    </div>
+                    <input type="checkbox" data-layer="launches" ${layers.launches ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-landing"></span>
+                      <span>Landeplätze (Landings)</span>
+                    </div>
+                    <input type="checkbox" data-layer="landings" ${layers.landings ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Startplatz Windfilter (Kompass) -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Startplatz-Ausrichtung (Windfilter)</h4>
+                <p class="drawer-hint">Filtert Startplätze nach passender Windrichtung:</p>
+                <div class="compass-rose-grid">
+                  ${windDirs.map(d => `
+                    <button data-wind="${d}" class="compass-btn ${windFilter.includes(d) ? 'active' : ''}">
+                      ${d}
+                    </button>
+                  `).join('')}
+                </div>
+                <div id="wind-drawer-reset-wrapper" style="display: ${windFilter.length > 0 ? 'block' : 'none'}; margin-top: 8px;">
+                  <button id="btn-reset-wind-filter" class="btn-secondary" style="width: 100%; font-size: 0.8rem; padding: 6px;">Filter zurücksetzen (${windFilter.join(', ')})</button>
+                </div>
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         <!-- 4. Leaflet Map Container -->
@@ -279,6 +324,21 @@ export class MapView {
       btnFabLayers.addEventListener('click', (e) => {
         e.stopPropagation();
         layersDrawer.classList.toggle('hidden');
+      });
+    }
+
+    // Segmented Category Tabs
+    this.container.querySelectorAll('.drawer-cat-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cat = btn.getAttribute('data-map-category');
+        store.setMapCategory(cat);
+      });
+    });
+
+    const btnFloatingInfo = this.container.querySelector('#btn-floating-info');
+    if (btnFloatingInfo) {
+      btnFloatingInfo.addEventListener('click', () => {
+        alert("SHV Live-Karte: Swisstopo Basiskarte, BAZL Luftfahrthindernisse, MeteoSchweiz Messwerte & Skybriefing DABS.");
       });
     }
 
@@ -385,22 +445,29 @@ export class MapView {
     const { layers } = store.state;
     if (layers.airspace) this.airspaceLayer.addTo(this.map);
     if (layers.wildschutz) this.wildschutzLayer.addTo(this.map);
+    if (layers.obstacles) this.obstaclesLayer.addTo(this.map);
     if (layers.launches) this.launchesLayer.addTo(this.map);
     if (layers.landings) this.landingsLayer.addTo(this.map);
     if (layers.stations) this.stationsLayer.addTo(this.map);
     if (layers.webcams) this.webcamsLayer.addTo(this.map);
     if (layers.foehnAxis) this.foehnLayer.addTo(this.map);
 
+    // Dynamic viewport obstacle loading
+    this.map.on('moveend zoomend', () => {
+      clearTimeout(this.obstacleDebounce);
+      this.obstacleDebounce = setTimeout(() => {
+        this.updateObstacles();
+      }, 150);
+    });
+
     // Click outside deselects and closes flyout drawer
     this.map.on('click', (e) => {
-      const layersDrawer = this.container.querySelector('#map-layers-drawer');
-      if (layersDrawer) layersDrawer.classList.add('hidden');
-
       // If clicked on empty space, deselect
       if (!e.originalEvent._shvHandled) {
         store.selectSite(null);
         store.selectStation(null);
         store.selectWebcam(null);
+        store.selectObstacle(null);
       }
     });
 
@@ -485,6 +552,13 @@ export class MapView {
       this.renderWebcams();
     } catch (err) {
       console.error('[MapView] Error loading webcams:', err);
+    }
+
+    // 7. BAZL Aviation Obstacles
+    try {
+      await this.updateObstacles();
+    } catch (err) {
+      console.error('[MapView] Error loading obstacles:', err);
     }
   }
 
@@ -633,6 +707,139 @@ export class MapView {
     });
 
     return marker;
+  }
+
+  renderObstaclePoint(feature, latlng) {
+    const p = feature.properties || {};
+    const isEndpoint = ['TRANSMISSION_LINE', 'CABLE_CAR', 'CATENARY', 'BRIDGE'].includes(p.obstacleType);
+
+    let iconUrl = '/assets/obstacles/red_circle.svg';
+    let iconSize = [10, 10];
+    let iconAnchor = [5, 5];
+
+    if (isEndpoint) {
+      if (p.marking === 'MARKED' || p.obstacleType === 'CATENARY') {
+        iconUrl = '/assets/obstacles/triangle.svg';
+        iconSize = [12, 12];
+        iconAnchor = [6, 6];
+      } else if (p.obstacleType === 'TRANSMISSION_LINE') {
+        iconUrl = '/assets/obstacles/red_circle.svg';
+        iconSize = [9, 9];
+        iconAnchor = [4.5, 4.5];
+      } else {
+        iconUrl = '/assets/obstacles/blue_circle.svg';
+        iconSize = [9, 9];
+        iconAnchor = [4.5, 4.5];
+      }
+    } else {
+      const styleId = p.styleId || 'ms_pole';
+      iconUrl = `/assets/obstacles/${styleId}.svg`;
+      if (styleId.includes('tree')) {
+        iconSize = [32, 28];
+        iconAnchor = [16, 26];
+      } else if (styleId.includes('crane')) {
+        iconSize = [28, 28];
+        iconAnchor = [14, 26];
+      } else if (styleId.includes('building')) {
+        iconSize = [24, 24];
+        iconAnchor = [12, 22];
+      } else if (styleId.includes('windmill')) {
+        iconSize = [24, 28];
+        iconAnchor = [12, 26];
+      } else {
+        iconSize = [22, 34];
+        iconAnchor = [11, 32];
+      }
+    }
+
+    const icon = L.icon({
+      iconUrl,
+      iconSize,
+      iconAnchor,
+      className: 'obstacle-marker-icon'
+    });
+
+    const marker = L.marker(latlng, { icon });
+    marker.on('click', (e) => {
+      e.originalEvent._shvHandled = true;
+      store.selectObstacle(feature);
+    });
+    return marker;
+  }
+
+  getObstacleStyle(feature) {
+    const p = feature.properties || {};
+    const geomType = feature.geometry?.type;
+    if (geomType === 'LineString' || geomType === 'MultiLineString') {
+      const isMarked = p.marking === 'MARKED';
+      const isTransmission = p.obstacleType === 'TRANSMISSION_LINE';
+      return {
+        color: isMarked ? '#CC0000' : (isTransmission ? '#0054FF' : '#0054FF'),
+        weight: isTransmission ? 2.5 : 2,
+        opacity: 0.95,
+        lineJoin: 'round',
+        lineCap: 'round',
+      };
+    } else if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
+      const isAirport = Boolean(p.airport);
+      return {
+        color: isAirport ? '#FF841B' : '#CC0000',
+        weight: 1.5,
+        fillColor: isAirport ? '#FF841B' : '#CC0000',
+        fillOpacity: 0.06,
+      };
+    }
+    return {};
+  }
+
+  bindObstacleEvents(feature, layer) {
+    if (feature.geometry?.type !== 'Point') {
+      layer.on('click', (e) => {
+        e.originalEvent._shvHandled = true;
+        store.selectObstacle(feature);
+      });
+      layer.on('mouseover', () => {
+        if (layer.setStyle) layer.setStyle({ weight: 4 });
+      });
+      layer.on('mouseout', () => {
+        if (layer.setStyle) {
+          const p = feature.properties || {};
+          layer.setStyle({ weight: p.obstacleType === 'TRANSMISSION_LINE' ? 2.5 : 2 });
+        }
+      });
+    }
+  }
+
+  async updateObstacles() {
+    if (!this.map || !store.state.layers.obstacles) {
+      if (this.obstaclesLayer && this.map?.hasLayer(this.obstaclesLayer)) {
+        this.obstaclesLayer.clearLayers();
+        this.map.removeLayer(this.obstaclesLayer);
+      }
+      return;
+    }
+
+    if (!this.map.hasLayer(this.obstaclesLayer)) {
+      this.obstaclesLayer.addTo(this.map);
+    }
+
+    const bounds = this.map.getBounds();
+    const zoom = this.map.getZoom();
+
+    const minLon = bounds.getWest() - 0.02;
+    const maxLon = bounds.getEast() + 0.02;
+    const minLat = bounds.getSouth() - 0.01;
+    const maxLat = bounds.getNorth() + 0.01;
+
+    try {
+      const data = await ShvApi.getObstacles({ minLon, minLat, maxLon, maxLat, zoom });
+      if (!data || !Array.isArray(data.features)) return;
+
+      this.obstaclesLayer.clearLayers();
+      this.obstaclesLayer.addData(data);
+    } catch (err) {
+      console.warn('[MapView.updateObstacles] Error fetching obstacles:', err);
+    }
   }
 
   getAirspaceStyle(feature) {
@@ -981,9 +1188,14 @@ export class MapView {
     updateVisibility(this.landingsLayer, state.layers.landings);
     updateVisibility(this.airspaceLayer, state.layers.airspace);
     updateVisibility(this.wildschutzLayer, state.layers.wildschutz);
+    updateVisibility(this.obstaclesLayer, state.layers.obstacles);
     updateVisibility(this.stationsLayer, state.layers.stations);
     updateVisibility(this.webcamsLayer, state.layers.webcams);
     updateVisibility(this.foehnLayer, state.layers.foehnAxis);
+
+    if (state.layers.obstacles) {
+      this.updateObstacles();
+    }
 
     // 3. Re-render Stations according to meteoMode
     if (state.layers.stations) {
@@ -1109,6 +1321,22 @@ export class MapView {
           card.classList.remove('active');
         }
       });
+    }
+
+    // Map Category tabs & panes sync
+    if (state.mapCategory) {
+      this.container.querySelectorAll('.drawer-cat-pill').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-map-category') === state.mapCategory);
+      });
+      this.container.querySelectorAll('.drawer-tab-pane').forEach(pane => {
+        const matches = pane.getAttribute('data-pane') === state.mapCategory;
+        pane.classList.toggle('active', matches);
+        pane.classList.toggle('hidden', !matches);
+      });
+      const dabsBtn = this.container.querySelector('#btn-floating-dabs');
+      if (dabsBtn) {
+        dabsBtn.classList.toggle('hidden', state.mapCategory !== 'AIRSPACE');
+      }
     }
   }
 }

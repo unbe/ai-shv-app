@@ -208,7 +208,7 @@ export class ForecastView {
   // =========================================================================
 
   renderTextSection(lang) {
-    const regionLabels = {
+    const allRegionLabels = {
       de: {
         '0': 'Deutschschweiz & Graubünden',
         '1': 'Alpensüdseite & Engadin',
@@ -224,7 +224,8 @@ export class ForecastView {
         '1': 'Sud delle Alpi & Engadina',
         '2': 'Svizzera romanda & Vallese',
       },
-    }[lang] || regionLabels.de;
+    };
+    const regionLabels = allRegionLabels[lang] || allRegionLabels.de;
 
     const tf = this.textForecastData || {};
 

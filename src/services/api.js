@@ -50,6 +50,25 @@ export class ShvApi {
     }
   }
 
+  static async getObstacles({ minLon, minLat, maxLon, maxLat, zoom }) {
+    try {
+      const q = new URLSearchParams({
+        minLon,
+        minLat,
+        maxLon,
+        maxLat,
+        zoom: Math.round(zoom || 12)
+      });
+      const resp = await fetch(`/api/obstacles?${q.toString()}`);
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch (err) {
+      console.warn('[ShvApi.getObstacles] Fetch failed:', err);
+    }
+    return { type: 'FeatureCollection', features: [] };
+  }
+
   static async getWildschutz() {
     if (cachedWildschutz) return cachedWildschutz;
     try {

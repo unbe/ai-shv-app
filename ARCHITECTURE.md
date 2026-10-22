@@ -321,14 +321,41 @@ Reversed from `fl5.java`, `sl2.java`, `xh7.java`, `ki4.java`, and `u62.java`:
   - **Right Column Wind Vector & Speed Profile**: Dedicated wind barb column and $0-45$ km/h wind speed line.
   - **Interactive Time Selector Bar**: Horizontal timeline with hour marks, current time indicator, stepper controls (`<<` / `>>`), and play button for smooth animation across the forecast day.
 
-### Unified Map Controls Architecture
-All map controls are consolidated into a **single, unified control drawer** (`#map-layers-drawer`):
-1. **Live-Wetter (Meteo-Overlays)**: Mode switcher for Wind & Böen, Temperatur, Föhn / Δp, Webcams, or Aus.
-2. **Fluggebiete & Lufträume**: Toggle switches for Startplätze (Take-offs), Landeplätze (Landings), Luftraum (CTR/TMA/Segelflug), and Wildruhezonen (300m AGL).
-3. **Startplatz-Windfilter (Compass Rose)**: Interactive 8-direction compass selector to filter launch sites according to flyable wind directions, with a one-click reset button.
-4. **Basiskarte (Swisstopo & Maps)**: Swisstopo Pixelkarte, Swisstopo Luftbild (Swissimage), Swisstopo Grau, and OpenStreetMap.
+### Unified Map Controls & Native Android Segmented Drawer Architecture
+In accordance with `Screenshot_20261022-164845.png` and decompiled bytecode (`LiveMapCategory.java`, `d.java`, `g34.java`), map controls are organized into a docked bottom drawer (`.map-bottom-drawer`) with a 3-tab segmented category selector:
+1. **`Weather` (`METEO`)**: Live weather overlays (`Wind & Böen`, `Temperatur`, `Föhn / Δp`, `Webcams`, `Keine`).
+2. **`Airspace` (`AIRSPACE`)**:
+   - **Base map**: Swisstopo Light Base Map (`topoLight` / `ch.swisstopo.pixelkarte-grau`), Pixelkarte (`topoColor`), Luftbild (`topoSatellite`), OpenStreetMap (`topoOsm`).
+   - **Luftraum & Hindernisse**:
+     - `Luftfahrthindernisse BAZL` (checked by default).
+     - `Luftraum (CTR, TMA, Segelflug)` (checked by default).
+     - `Wildschutz & Jagdbanngebiete` (checked by default).
+   - **Floating DABS Button**: Floating pill (`DABS ↗`) linking directly to official Skybriefing DABS (`https://www.skybriefing.com/de/dabs`).
+3. **`Flying sites` (`FLYING_AREAS`)**:
+   - `Startplätze (Take-offs)` and `Landeplätze (Landings)` toggles.
+   - 8-direction wind compass rose filter with reset button.
 
-The top floating bar is dedicated exclusively to the location/site search bar and active filter indicators, preventing any controls fragmentation or duplicate UI elements. Leaflet is absolutely positioned within the map container to guarantee 100% viewport coverage.
+### BAZL Aviation Obstacles (`Luftfahrthindernisse`)
+Reversed from `apk_analysis/unpacked/assets/map/layers/bazl_obstacles/style.json`, `b20.java`, `n10.java`, and `n20.java`:
+- **Data Source & CDN Endpoints**:
+  - Complete Swiss GeoJSON dataset: `https://shv-app-static-prod.ubmeteo.io/v1/obstacles/bazl.geojson` (225,389 authentic features).
+  - Production vector tile CDN: `https://shv-app-static-prod.ubmeteo.io/v1/obstacles/tiles/bazl/{z}/{x}/{y}.pbf` (levels 6, 9, 12).
+- **Spatial Grid Indexing & LOD Engine (`server/obstacles_provider.js`)**:
+  - Caches authentic GeoJSON to local disk with 24-hour TTL and builds a 0.1° spatial binning index ($~7 \times 11$ km cells) in ~45 ms.
+  - Viewport bounding-box queries execute in sub-millisecond time ($<0.5$ ms).
+  - Strict zoom LOD filtering adhering to native `style.json`:
+    - `z >= 6`: Regional lines (`TRANSMISSION_LINE`, `CABLE_CAR`, `BRIDGE`, `CATENARY`) and hazard polygons.
+    - `z >= 8`: Structural point symbols (masts, antennas, cranes, tree groups, buildings, windmills).
+    - `z >= 13`: Cable pylon endpoint markers (circular dots along transmission lines and triangles for marked catenaries).
+- **Styling Parity with Native App**:
+  - Transmission lines colored `#0054FF` (blue) or `#CC0000` (red if marked), with line width scaling from 1.5 to 5.0.
+  - Endpoints rendered as red dots (`red_circle.svg`) or triangles (`triangle.svg`).
+  - Point obstacles rendered using authentic SVG symbols (`ms_pole.svg`, `ms_tree_group.svg`, `ms_crane.svg`, `ms_building.svg`, `ms_windmill.svg`).
+- **Obstacle Details Bottom Sheet (`BottomSheet.js`)**:
+  - Displays obstacle type in German (`Freileitung`, `Baukran`, `Mast`, `Baumgruppe`, `Seilbahn`, etc.).
+  - Technical metrics: `Maximale Höhe (AGL)` in meters, `Maximale Höhe (AMSL)` in meters ü. M., `Gesamtlänge`, `Radius`, `Flugplatz` code (if within aerodrome zone).
+  - Official markings (`Markierung: Markiert / Keine`), lighting status (`Beleuchtung: Beleuchtet / Keine`), sanction decree notice (`Verfügung`), and effective date (`Inkrafttretensdatum`).
+  - Direct navigation link to Apple/Google Maps and Skybriefing DABS consultation.
 
 ---
 

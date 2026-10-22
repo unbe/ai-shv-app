@@ -18,13 +18,15 @@ class AppState {
       sid: savedSession,
       
       // Map configuration
-      baseMap: 'topoColor', // 'topoColor' | 'topoSatellite' | 'topoLight' | 'topoOsm'
+      baseMap: 'topoLight', // 'topoLight' | 'topoColor' | 'topoSatellite' | 'topoOsm'
+      mapCategory: 'AIRSPACE', // 'METEO' | 'AIRSPACE' | 'FLYING_AREAS'
       meteoMode: 'WIND', // 'WIND' | 'TEMPERATURE' | 'PRESSURE_DIFFERENCE' | 'WEBCAM' | 'NONE'
       layers: {
         launches: true,
         landings: true,
         airspace: true,
         wildschutz: true,
+        obstacles: true,
         stations: true,
         webcams: false,
         foehnAxis: false,
@@ -34,6 +36,7 @@ class AppState {
       selectedSite: null,
       selectedStation: null,
       selectedWebcam: null,
+      selectedObstacle: null,
       pilotLocation: null,
 
       // Live data
@@ -170,6 +173,12 @@ class AppState {
     this.state.selectedSite = null;
     this.state.selectedStation = null;
     this.state.selectedWebcam = null;
+    this.state.selectedObstacle = null;
+    this.notify();
+  }
+
+  setMapCategory(category) {
+    this.state.mapCategory = category;
     this.notify();
   }
 
@@ -252,6 +261,17 @@ class AppState {
 
   selectWebcam(wc) {
     this.state.selectedWebcam = wc;
+    if (wc) this.state.selectedObstacle = null;
+    this.notify();
+  }
+
+  selectObstacle(obs) {
+    this.state.selectedObstacle = obs;
+    if (obs) {
+      this.state.selectedSite = null;
+      this.state.selectedStation = null;
+      this.state.selectedWebcam = null;
+    }
     this.notify();
   }
 
