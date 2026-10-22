@@ -26,8 +26,10 @@ export class ForecastView {
     this.selectedStation = null;
     this.emagramForecastData = null;
     this.activeEmagramTimeIndex = 0;
+    this.activeEmagramFloatIndex = 0;
     this.isPlayingEmagram = false;
     this.emagramPlayTimer = null;
+    this.emagramAnimFrame = null;
     this.searchQuery = '';
     this.emagramMap = null;
     this.stationMarkersLayer = null;
@@ -83,6 +85,10 @@ export class ForecastView {
   unmount() {
     this.stopOutlookPlayer();
     this.stopEmagramPlayer();
+    if (this.emagramAnimFrame) {
+      cancelAnimationFrame(this.emagramAnimFrame);
+      this.emagramAnimFrame = null;
+    }
     if (this.emagramMap) {
       this.emagramMap.remove();
       this.emagramMap = null;
@@ -112,8 +118,10 @@ export class ForecastView {
             }
           }
           this.activeEmagramTimeIndex = closestIdx;
+          this.activeEmagramFloatIndex = closestIdx;
         } else {
           this.activeEmagramTimeIndex = 0;
+          this.activeEmagramFloatIndex = 0;
         }
       }
     } catch (err) {
@@ -877,8 +885,8 @@ export class ForecastView {
                 class="emagram-time-slider" 
                 min="0" 
                 max="${Math.max(0, totalSteps - 1)}" 
-                value="${this.activeEmagramTimeIndex}" 
-                step="1" 
+                value="${this.activeEmagramFloatIndex}" 
+                step="0.02" 
                 aria-label="Zeitstrahl"
               />
             </div>
@@ -1070,16 +1078,73 @@ export class ForecastView {
     };
   }
 
-  updateEmagramTimeStepDOM(newIndex) {
+  getInterpolatedSoundingStep(floatIndex) {
+    const timeSteps = this.emagramForecastData?.timeSteps || [];
+    if (!timeSteps.length) return null;
+
+    const clamped = Math.max(0, Math.min(timeSteps.length - 1, floatIndex));
+    const baseIdx = Math.floor(clamped);
+    const nextIdx = Math.min(timeSteps.length - 1, baseIdx + 1);
+    const fraction = clamped - baseIdx;
+
+    const stepA = timeSteps[baseIdx];
+    const stepB = timeSteps[nextIdx];
+
+    if (fraction <= 0.001 || baseIdx === nextIdx) {
+      return stepA;
+    }
+
+    const timestamp = Math.round(stepA.timestamp + (stepB.timestamp - stepA.timestamp) * fraction);
+    const levelsA = stepA.levels || [];
+    const levelsB = stepB.levels || [];
+    const maxLvl = Math.min(levelsA.length, levelsB.length);
+    const interpLevels = [];
+
+    for (let i = 0; i < maxLvl; i++) {
+      const la = levelsA[i];
+      const lb = levelsB[i];
+
+      const pressHpa = Math.round((la.pressHpa + (lb.pressHpa - la.pressHpa) * fraction) * 10) / 10;
+      const tempC = Math.round((la.tempC + (lb.tempC - la.tempC) * fraction) * 10) / 10;
+      const dewC = Math.round((la.dewC + (lb.dewC - la.dewC) * fraction) * 10) / 10;
+      const speedKmH = Math.round((la.speedKmH + (lb.speedKmH - la.speedKmH) * fraction) * 10) / 10;
+      const heightM = Math.round(la.heightM + (lb.heightM - la.heightM) * fraction);
+      const lapseRate = Math.round((la.lapseRate + (lb.lapseRate - la.lapseRate) * fraction) * 10) / 10;
+
+      let diff = (lb.dirDeg - la.dirDeg) % 360;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+      const dirDeg = Math.round((la.dirDeg + diff * fraction + 360) % 360);
+
+      interpLevels.push({
+        pressHpa,
+        tempC,
+        dewC,
+        speedKmH,
+        dirDeg,
+        heightM,
+        lapseRate,
+      });
+    }
+
+    return {
+      timestamp,
+      levels: interpLevels,
+    };
+  }
+
+  updateEmagramTimeStepDOM(newFloatIndex) {
     const timeSteps = this.emagramForecastData?.timeSteps || [];
     const totalSteps = timeSteps.length;
     if (!totalSteps) return;
 
-    this.activeEmagramTimeIndex = Math.max(0, Math.min(totalSteps - 1, newIndex));
-    const currentStep = timeSteps[this.activeEmagramTimeIndex];
+    this.activeEmagramFloatIndex = Math.max(0, Math.min(totalSteps - 1, newFloatIndex));
+    this.activeEmagramTimeIndex = Math.round(this.activeEmagramFloatIndex);
+
+    const currentStep = this.getInterpolatedSoundingStep(this.activeEmagramFloatIndex);
     if (!currentStep) return;
 
-    // 1. Update timestamp badge
+    // 1. Update timestamp badge with exact hour:minute
     const headerTimeEl = this.container.querySelector('#emagram-header-time');
     if (headerTimeEl) {
       const d = new Date(currentStep.timestamp);
@@ -1097,22 +1162,24 @@ export class ForecastView {
 
     const stepLabelEl = this.container.querySelector('#emagram-step-label');
     if (stepLabelEl) {
-      stepLabelEl.textContent = `Prognoseschritt ${this.activeEmagramTimeIndex + 1} / ${totalSteps}`;
+      const d = new Date(currentStep.timestamp);
+      const timeStr = d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+      stepLabelEl.textContent = `${timeStr} (Schritt ${this.activeEmagramTimeIndex + 1}/${totalSteps})`;
     }
 
     // 3. Update slider input value & cursor indicator
     const slider = this.container.querySelector('#emagram-time-slider');
-    if (slider && parseInt(slider.value, 10) !== this.activeEmagramTimeIndex) {
-      slider.value = this.activeEmagramTimeIndex;
+    if (slider && Math.abs(parseFloat(slider.value) - this.activeEmagramFloatIndex) > 0.05) {
+      slider.value = this.activeEmagramFloatIndex;
     }
 
     const cursor = this.container.querySelector('#emagram-cursor-indicator');
     if (cursor) {
-      const pct = (this.activeEmagramTimeIndex / Math.max(1, totalSteps - 1)) * 100;
+      const pct = (this.activeEmagramFloatIndex / Math.max(1, totalSteps - 1)) * 100;
       cursor.style.left = `${pct}%`;
     }
 
-    // 4. Update SVG Curves in-place without destroying DOM
+    // 4. Update SVG Curves in-place without destroying DOM (fluid 60 FPS morphing)
     const curves = this.computeSoundingCurves(currentStep.levels);
     const dewPoly = this.container.querySelector('#emagram-dew-polyline');
     if (dewPoly) dewPoly.setAttribute('points', curves.dewPolyline);
@@ -1125,6 +1192,35 @@ export class ForecastView {
 
     const windBarbsLayer = this.container.querySelector('#emagram-wind-barbs');
     if (windBarbsLayer) windBarbsLayer.innerHTML = curves.windBarbsSvg;
+  }
+
+  animateEmagramTo(targetFloatIndex, durationMs = 300) {
+    if (this.emagramAnimFrame) {
+      cancelAnimationFrame(this.emagramAnimFrame);
+      this.emagramAnimFrame = null;
+    }
+    const startIndex = this.activeEmagramFloatIndex;
+    const startTime = performance.now();
+
+    const tick = (now) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / durationMs);
+      // Ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const currentFloat = startIndex + (targetFloatIndex - startIndex) * eased;
+      this.updateEmagramTimeStepDOM(currentFloat);
+
+      if (progress < 1) {
+        this.emagramAnimFrame = requestAnimationFrame(tick);
+      } else {
+        this.activeEmagramFloatIndex = targetFloatIndex;
+        this.activeEmagramTimeIndex = Math.round(targetFloatIndex);
+        this.updateEmagramTimeStepDOM(targetFloatIndex);
+        this.emagramAnimFrame = null;
+      }
+    };
+
+    this.emagramAnimFrame = requestAnimationFrame(tick);
   }
 
   updateEmagramDetailDOM() {
@@ -1143,7 +1239,7 @@ export class ForecastView {
 
     if (slider) {
       slider.addEventListener('input', (e) => {
-        const idx = parseInt(e.target.value, 10);
+        const idx = parseFloat(e.target.value);
         this.updateEmagramTimeStepDOM(idx);
       });
     }
@@ -1178,8 +1274,8 @@ export class ForecastView {
 
   stepEmagramTime(delta) {
     const totalSteps = (this.emagramForecastData?.timeSteps || []).length || 1;
-    const nextIdx = (this.activeEmagramTimeIndex + delta + totalSteps) % totalSteps;
-    this.updateEmagramTimeStepDOM(nextIdx);
+    const targetIdx = (Math.round(this.activeEmagramFloatIndex) + delta + totalSteps) % totalSteps;
+    this.animateEmagramTo(targetIdx, 300);
   }
 
   toggleEmagramPlay() {

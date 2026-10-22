@@ -123,89 +123,31 @@ export class MapView {
           </button>
         </div>
 
-        <!-- 3. Bottom Controls Stack (Directly matching Screenshot_20261022-164845.png) -->
-        <div class="map-bottom-stack">
-          <div class="map-bottom-floating-row">
-            <button id="btn-floating-info" class="map-floating-info" title="Information, Legende & Quellen">
-              <span>i</span>
-            </button>
-            <a id="btn-floating-dabs" href="https://www.skybriefing.com/de/dabs" target="_blank" rel="noopener" class="map-floating-dabs ${mapCategory === 'AIRSPACE' ? '' : 'hidden'}" title="Skybriefing DABS Daily Airspace Bulletin">
-              <span>DABS</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-            </a>
+        <!-- 3. Floating Map Controls Flyout (Positioned near FAB Button, matching Android APK layout) -->
+        <div id="map-layers-drawer" class="map-layers-flyout hidden">
+          <div class="layers-flyout-header">
+            <div class="layers-flyout-title-row">
+              <div class="layers-flyout-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                  <polyline points="2 17 12 22 22 17"></polyline>
+                  <polyline points="2 12 12 17 22 12"></polyline>
+                </svg>
+                <span>Karten-Ebenen</span>
+              </div>
+              <button id="btn-close-layers" class="layers-flyout-close" title="Schliessen">&times;</button>
+            </div>
+
+            <!-- Segmented Category Tabs (Meteo | Luftraum | Fluggebiete) -->
+            <div class="drawer-category-bar">
+              <button data-map-category="METEO" class="drawer-cat-pill ${mapCategory === 'METEO' ? 'active' : ''}">Meteo</button>
+              <button data-map-category="AIRSPACE" class="drawer-cat-pill ${mapCategory === 'AIRSPACE' ? 'active' : ''}">Luftraum</button>
+              <button data-map-category="FLYING_AREAS" class="drawer-cat-pill ${mapCategory === 'FLYING_AREAS' ? 'active' : ''}">Fluggebiete</button>
+            </div>
           </div>
 
-          <div id="map-layers-drawer" class="map-drawer map-bottom-drawer">
-            <div class="drawer-drag-handle"></div>
-
-            <!-- Segmented Category Tabs -->
-            <div class="drawer-category-bar">
-              <button data-map-category="METEO" class="drawer-cat-pill ${mapCategory === 'METEO' ? 'active' : ''}">Weather</button>
-              <button data-map-category="AIRSPACE" class="drawer-cat-pill ${mapCategory === 'AIRSPACE' ? 'active' : ''}">Airspace</button>
-              <button data-map-category="FLYING_AREAS" class="drawer-cat-pill ${mapCategory === 'FLYING_AREAS' ? 'active' : ''}">Flying sites</button>
-            </div>
-
           <div class="drawer-body">
-            <!-- 3.1 Airspace & Obstacles Tab -->
-            <div class="drawer-tab-pane ${mapCategory === 'AIRSPACE' ? 'active' : 'hidden'}" data-pane="AIRSPACE">
-              <!-- Base map selection -->
-              <div class="drawer-section">
-                <h4 class="drawer-subtitle">Base map</h4>
-                <div class="basemap-grid">
-                  <button data-base="topoLight" class="basemap-card ${baseMap === 'topoLight' ? 'active' : ''}">
-                    <img src="/assets/ic_topo_light.png" alt="Light" class="basemap-card-img" />
-                    <span>Light Base Map</span>
-                  </button>
-                  <button data-base="topoColor" class="basemap-card ${baseMap === 'topoColor' ? 'active' : ''}">
-                    <img src="/assets/ic_topo_raster.png" alt="Pixelkarte" class="basemap-card-img" />
-                    <span>Pixelkarte</span>
-                  </button>
-                  <button data-base="topoSatellite" class="basemap-card ${baseMap === 'topoSatellite' ? 'active' : ''}">
-                    <img src="/assets/ic_topo_imagery.png" alt="Luftbild" class="basemap-card-img" />
-                    <span>Luftbild</span>
-                  </button>
-                  <button data-base="topoOsm" class="basemap-card ${baseMap === 'topoOsm' ? 'active' : ''}">
-                    <div class="basemap-osm-placeholder">OSM</div>
-                    <span>OpenStreet</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Airspace & Obstacle toggles -->
-              <div class="drawer-section">
-                <h4 class="drawer-subtitle">Luftraum & Hindernisse</h4>
-                <div class="layer-switch-list">
-                  <label class="layer-switch-item">
-                    <div class="layer-switch-label">
-                      <span class="chip-dot dot-obstacle"></span>
-                      <span>Luftfahrthindernisse BAZL</span>
-                    </div>
-                    <input type="checkbox" data-layer="obstacles" ${layers.obstacles ? 'checked' : ''} />
-                    <span class="switch-toggle"></span>
-                  </label>
-
-                  <label class="layer-switch-item">
-                    <div class="layer-switch-label">
-                      <span class="chip-dot dot-airspace"></span>
-                      <span>Luftraum (CTR, TMA, Segelflug)</span>
-                    </div>
-                    <input type="checkbox" data-layer="airspace" ${layers.airspace ? 'checked' : ''} />
-                    <span class="switch-toggle"></span>
-                  </label>
-
-                  <label class="layer-switch-item">
-                    <div class="layer-switch-label">
-                      <span class="chip-dot dot-wild"></span>
-                      <span>Wildruhezonen & Schutzgebiete</span>
-                    </div>
-                    <input type="checkbox" data-layer="wildschutz" ${layers.wildschutz ? 'checked' : ''} />
-                    <span class="switch-toggle"></span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <!-- 3.2 Weather Tab -->
+            <!-- PANE 1: METEO (Weather) -->
             <div class="drawer-tab-pane ${mapCategory === 'METEO' ? 'active' : 'hidden'}" data-pane="METEO">
               <div class="drawer-section">
                 <h4 class="drawer-subtitle">Live-Wetter (Meteo-Overlays)</h4>
@@ -231,12 +173,153 @@ export class MapView {
                   </button>
                 </div>
               </div>
+
+              <!-- Dangers in Meteo -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Gefahren</h4>
+                <div class="layer-switch-list">
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-obstacle"></span>
+                      <span>Luftfahrthindernisse BAZL</span>
+                    </div>
+                    <input type="checkbox" data-layer="obstacles" ${layers.obstacles ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Flying Sites in Meteo -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Fluggebietsinformationen</h4>
+                <div class="layer-switch-list">
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-launch"></span>
+                      <span>Startplätze (Take-offs)</span>
+                    </div>
+                    <input type="checkbox" data-layer="launches" ${layers.launches ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-landing"></span>
+                      <span>Landeplätze (Landings)</span>
+                    </div>
+                    <input type="checkbox" data-layer="landings" ${layers.landings ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Base map selection -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Basiskarte</h4>
+                <div class="basemap-grid">
+                  <button data-base="topoLight" class="basemap-card ${baseMap === 'topoLight' ? 'active' : ''}">
+                    <img src="/assets/ic_topo_light.png" alt="Light" class="basemap-card-img" />
+                    <span>Light Base Map</span>
+                  </button>
+                  <button data-base="topoColor" class="basemap-card ${baseMap === 'topoColor' ? 'active' : ''}">
+                    <img src="/assets/ic_topo_raster.png" alt="Pixelkarte" class="basemap-card-img" />
+                    <span>Pixelkarte</span>
+                  </button>
+                  <button data-base="topoOsm" class="basemap-card ${baseMap === 'topoOsm' ? 'active' : ''}">
+                    <div class="basemap-osm-placeholder">RELIEF</div>
+                    <span>Reliefkarte</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <!-- 3.3 Flying Sites Tab -->
+            <!-- PANE 2: AIRSPACE (Luftraum) -->
+            <div class="drawer-tab-pane ${mapCategory === 'AIRSPACE' ? 'active' : 'hidden'}" data-pane="AIRSPACE">
+              <!-- Gefahren Section (Dangers) -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Gefahren</h4>
+                <div class="layer-switch-list">
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-obstacle"></span>
+                      <span>Luftfahrthindernisse BAZL</span>
+                    </div>
+                    <input type="checkbox" data-layer="obstacles" ${layers.obstacles ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-airspace"></span>
+                      <span>Luftraum (CTR, TMA, Segelflug)</span>
+                    </div>
+                    <input type="checkbox" data-layer="airspace" ${layers.airspace ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Umwelt & Wildschutz -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Umwelt & Wildschutz</h4>
+                <div class="layer-switch-list">
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-wild"></span>
+                      <span>Wildruhezonen & Schutzgebiete</span>
+                    </div>
+                    <input type="checkbox" data-layer="wildschutz" ${layers.wildschutz ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Flying Sites in Airspace -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Fluggebietsinformationen</h4>
+                <div class="layer-switch-list">
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-launch"></span>
+                      <span>Startplätze (Take-offs)</span>
+                    </div>
+                    <input type="checkbox" data-layer="launches" ${layers.launches ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-landing"></span>
+                      <span>Landeplätze (Landings)</span>
+                    </div>
+                    <input type="checkbox" data-layer="landings" ${layers.landings ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Base map selection -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Basiskarte</h4>
+                <div class="basemap-grid">
+                  <button data-base="topoLight" class="basemap-card ${baseMap === 'topoLight' ? 'active' : ''}">
+                    <img src="/assets/ic_topo_light.png" alt="Light" class="basemap-card-img" />
+                    <span>Light Base Map</span>
+                  </button>
+                  <button data-base="topoColor" class="basemap-card ${baseMap === 'topoColor' ? 'active' : ''}">
+                    <img src="/assets/ic_topo_raster.png" alt="Pixelkarte" class="basemap-card-img" />
+                    <span>Pixelkarte</span>
+                  </button>
+                  <button data-base="topoSatellite" class="basemap-card ${baseMap === 'topoSatellite' ? 'active' : ''}">
+                    <img src="/assets/ic_topo_imagery.png" alt="Luftbild" class="basemap-card-img" />
+                    <span>Luftbild</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- PANE 3: FLYING AREAS (Fluggebiete) -->
             <div class="drawer-tab-pane ${mapCategory === 'FLYING_AREAS' ? 'active' : 'hidden'}" data-pane="FLYING_AREAS">
               <div class="drawer-section">
-                <h4 class="drawer-subtitle">Fluggebiete</h4>
+                <h4 class="drawer-subtitle">Fluggebietsinformationen</h4>
                 <div class="layer-switch-list">
                   <label class="layer-switch-item">
                     <div class="layer-switch-label">
@@ -273,9 +356,70 @@ export class MapView {
                   <button id="btn-reset-wind-filter" class="btn-secondary" style="width: 100%; font-size: 0.8rem; padding: 6px;">Filter zurücksetzen (${windFilter.join(', ')})</button>
                 </div>
               </div>
+
+              <!-- Gefahren Section (Dangers) -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Gefahren</h4>
+                <div class="layer-switch-list">
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-obstacle"></span>
+                      <span>Luftfahrthindernisse BAZL</span>
+                    </div>
+                    <input type="checkbox" data-layer="obstacles" ${layers.obstacles ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Umwelt & Wildschutz -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Umwelt & Wildschutz</h4>
+                <div class="layer-switch-list">
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-wild"></span>
+                      <span>Wildruhezonen & Schutzgebiete</span>
+                    </div>
+                    <input type="checkbox" data-layer="wildschutz" ${layers.wildschutz ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Base map selection -->
+              <div class="drawer-section">
+                <h4 class="drawer-subtitle">Basiskarte</h4>
+                <div class="basemap-grid">
+                  <button data-base="topoLight" class="basemap-card ${baseMap === 'topoLight' ? 'active' : ''}">
+                    <img src="/assets/ic_topo_light.png" alt="Light" class="basemap-card-img" />
+                    <span>Light Base Map</span>
+                  </button>
+                  <button data-base="topoColor" class="basemap-card ${baseMap === 'topoColor' ? 'active' : ''}">
+                    <img src="/assets/ic_topo_raster.png" alt="Pixelkarte" class="basemap-card-img" />
+                    <span>Pixelkarte</span>
+                  </button>
+                  <button data-base="topoSatellite" class="basemap-card ${baseMap === 'topoSatellite' ? 'active' : ''}">
+                    <img src="/assets/ic_topo_imagery.png" alt="Luftbild" class="basemap-card-img" />
+                    <span>Luftbild</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+
+        <!-- 4. Floating Action Corner Stack (Info & DABS) -->
+        <div class="map-bottom-stack">
+          <div class="map-bottom-floating-row">
+            <button id="btn-floating-info" class="map-floating-info" title="Information, Legende & Quellen">
+              <span>i</span>
+            </button>
+            <a id="btn-floating-dabs" href="https://www.skybriefing.com/de/dabs" target="_blank" rel="noopener" class="map-floating-dabs ${mapCategory === 'AIRSPACE' ? '' : 'hidden'}" title="Skybriefing DABS Daily Airspace Bulletin">
+              <span>DABS</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </a>
+          </div>
         </div>
 
         <!-- 4. Leaflet Map Container -->
@@ -319,12 +463,27 @@ export class MapView {
     const btnFabLayers = this.container.querySelector('#btn-fab-layers');
     const btnFabCenter = this.container.querySelector('#btn-fab-center');
     const layersDrawer = this.container.querySelector('#map-layers-drawer');
+    const closeLayers = this.container.querySelector('#btn-close-layers');
 
     if (btnFabLayers && layersDrawer) {
       btnFabLayers.addEventListener('click', (e) => {
         e.stopPropagation();
-        layersDrawer.classList.toggle('hidden');
+        const isHidden = layersDrawer.classList.toggle('hidden');
+        btnFabLayers.classList.toggle('active', !isHidden);
       });
+    }
+
+    if (closeLayers && layersDrawer) {
+      closeLayers.addEventListener('click', (e) => {
+        e.stopPropagation();
+        layersDrawer.classList.add('hidden');
+        btnFabLayers?.classList.remove('active');
+      });
+    }
+
+    // Prevent map click when interacting inside drawer
+    if (layersDrawer) {
+      layersDrawer.addEventListener('click', (e) => e.stopPropagation());
     }
 
     // Segmented Category Tabs
@@ -342,13 +501,15 @@ export class MapView {
       });
     }
 
-    const closeLayers = this.container.querySelector('#btn-close-layers');
-    if (closeLayers && layersDrawer) {
-      closeLayers.addEventListener('click', () => layersDrawer.classList.add('hidden'));
-    }
-
-    // Prevent map click when interacting inside drawer
-    if (layersDrawer) layersDrawer.addEventListener('click', (e) => e.stopPropagation());
+    // Close flyout when clicking document outside
+    document.addEventListener('click', (e) => {
+      if (layersDrawer && !layersDrawer.classList.contains('hidden')) {
+        if (!layersDrawer.contains(e.target) && !btnFabLayers?.contains(e.target)) {
+          layersDrawer.classList.add('hidden');
+          btnFabLayers?.classList.remove('active');
+        }
+      }
+    });
 
     if (btnFabCenter) {
       btnFabCenter.addEventListener('click', () => {
@@ -826,8 +987,8 @@ export class MapView {
     const bounds = this.map.getBounds();
     const zoom = this.map.getZoom();
 
-    // At broad national scale (z < 10), clear obstacles to keep base map uncluttered
-    if (zoom < 10) {
+    // At very broad overview scale (z < 8), clear obstacles
+    if (zoom < 8) {
       this.obstaclesLayer.clearLayers();
       return;
     }

@@ -158,59 +158,81 @@ export async function queryObstacles({ minLon, minLat, maxLon, maxLat, zoom = 12
   const gy0 = Math.floor(minLat * 10);
   const gy1 = Math.floor(maxLat * 10);
 
-  const numCells = Math.max(1, (gx1 - gx0 + 1) * (gy1 - gy0 + 1));
-  // Distribute quota evenly across all spatial cells so West doesn't starve East
-  const maxPerCell = Math.max(250, Math.ceil(3500 / numCells));
-
-  const seen = new Set();
-  const matched = [];
-
+  // Find all cells that actually contain data in this bounding box
+  const activeCells = [];
   for (let gx = gx0; gx <= gx1; gx++) {
     for (let gy = gy0; gy <= gy1; gy++) {
       const cell = spatialGrid.get(`${gx}_${gy}`);
-      if (!cell) continue;
-
-      let cellCount = 0;
-      for (let i = 0; i < cell.length; i++) {
-        if (cellCount >= maxPerCell) break;
-
-        const f = cell[i];
-        if (seen.has(f._uid)) continue;
-
-        const [bMinX, bMinY, bMaxX, bMaxY] = f._bbox;
-        // Bounding box intersection check
-        if (bMaxX < minLon || bMinX > maxLon || bMaxY < minLat || bMinY > maxLat) {
-          continue;
-        }
-
-        const geomType = f.geometry?.type;
-        const props = f.properties || {};
-
-        // Multi-level zoom LOD filtering derived from Android APK style.json:
-        if (geomType === 'Point') {
-          const isEndpoint = ['TRANSMISSION_LINE', 'CABLE_CAR', 'CATENARY', 'BRIDGE'].includes(props.obstacleType);
-          if (isEndpoint) {
-            if (!isDetail) continue; // Cable pylon endpoint dots only at zoom >= 13
-          } else {
-            if (z < 9 && (props.maxHeightAgl < 80 && props.lighting === 'NONE')) continue;
-            if (z < 11 && (props.maxHeightAgl < 35 && props.lighting === 'NONE')) continue;
-            if (z < 12 && (props.small && props.lighting === 'NONE')) continue;
-          }
-        } else if (geomType === 'LineString' || geomType === 'Polygon') {
-          if (z < 9) {
-            if (props.maxHeightAgl < 60 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
-          } else if (z < 11) {
-            if (props.maxHeightAgl < 30 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
-          } else if (z < 12) {
-            if (props.small && props.maxHeightAgl < 20 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
-          }
-        }
-
-        seen.add(f._uid);
-        matched.push(f);
-        cellCount++;
+      if (cell && cell.length > 0) {
+        activeCells.push(cell);
       }
     }
+  }
+
+  // Filter features within each active cell by bbox and zoom LOD
+  const cellCandidates = [];
+  for (const cell of activeCells) {
+    const list = [];
+    for (let i = 0; i < cell.length; i++) {
+      const f = cell[i];
+      const [bMinX, bMinY, bMaxX, bMaxY] = f._bbox;
+      if (bMaxX < minLon || bMinX > maxLon || bMaxY < minLat || bMinY > maxLat) {
+        continue;
+      }
+
+      const geomType = f.geometry?.type;
+      const props = f.properties || {};
+
+      // Multi-level zoom LOD filtering derived from Android APK style.json:
+      if (geomType === 'Point') {
+        const isEndpoint = ['TRANSMISSION_LINE', 'CABLE_CAR', 'CATENARY', 'BRIDGE'].includes(props.obstacleType);
+        if (isEndpoint) {
+          if (!isDetail) continue; // Cable pylon endpoint dots only at zoom >= 13
+        } else {
+          if (z < 9 && (props.maxHeightAgl < 70 && props.lighting === 'NONE')) continue;
+          if (z < 11 && (props.maxHeightAgl < 30 && props.lighting === 'NONE')) continue;
+          if (z < 12 && (props.small && props.lighting === 'NONE')) continue;
+        }
+      } else if (geomType === 'LineString' || geomType === 'Polygon') {
+        if (z < 9) {
+          if (props.maxHeightAgl < 50 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
+        } else if (z < 11) {
+          if (props.maxHeightAgl < 25 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
+        } else if (z < 12) {
+          if (props.small && props.maxHeightAgl < 15 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
+        }
+      }
+      list.push(f);
+    }
+    if (list.length > 0) {
+      cellCandidates.push(list);
+    }
+  }
+
+  // Fair Round-Robin distribution across all spatial cells
+  // This guarantees West, Central, and East Switzerland all receive equal representation without any longitude starvation
+  const TARGET_MAX = 2000;
+  const seen = new Set();
+  const matched = [];
+
+  let round = 0;
+  let addedInRound = true;
+
+  while (matched.length < TARGET_MAX && addedInRound) {
+    addedInRound = false;
+    for (let c = 0; c < cellCandidates.length; c++) {
+      const list = cellCandidates[c];
+      if (round < list.length) {
+        const f = list[round];
+        if (!seen.has(f._uid)) {
+          seen.add(f._uid);
+          matched.push(f);
+          addedInRound = true;
+          if (matched.length >= TARGET_MAX) break;
+        }
+      }
+    }
+    round++;
   }
 
   return {

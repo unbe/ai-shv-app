@@ -675,68 +675,114 @@ body {
   background: rgba(30, 41, 59, 0.95);
 }
 
-.map-bottom-drawer {
-  position: relative !important;
-  top: auto !important;
-  right: auto !important;
-  width: 100% !important;
-  max-width: 460px !important;
-  max-height: 48vh !important;
-  background: #394452 !important;
-  color: #FFFFFF !important;
-  border-top-left-radius: 26px !important;
-  border-top-right-radius: 26px !important;
-  border-bottom-left-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-bottom: none !important;
-  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35) !important;
+/* ==========================================================
+   LIVE MAP LAYERS FLYOUT (Positioned near the invoking FAB)
+   ========================================================== */
+.map-layers-flyout {
+  position: absolute;
+  top: 66px;
+  right: 14px;
+  width: 360px;
+  max-width: calc(100vw - 28px);
+  max-height: calc(100vh - 120px);
+  background: var(--bg-card);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  z-index: 550;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   pointer-events: auto;
-  animation: none !important;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top right;
 }
 
-.map-bottom-drawer.hidden {
-  transform: translateY(calc(100% - 44px)) !important;
-  display: flex !important;
+.map-layers-flyout.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.92) translateY(-10px);
+}
+
+.layers-flyout-header {
+  padding: 12px 16px 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.layers-flyout-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.layers-flyout-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.layers-flyout-close {
+  background: transparent;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.layers-flyout-close:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .drawer-drag-handle {
-  width: 36px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 2px;
-  margin: 10px auto 6px auto;
-  flex-shrink: 0;
-  cursor: pointer;
+  display: none;
 }
 
 .drawer-category-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 16px 8px 16px;
-  gap: 8px;
-  flex-shrink: 0;
+  gap: 6px;
+  background: var(--bg-primary);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
 }
 
 .drawer-cat-pill {
   flex: 1;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.88rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
   font-weight: 600;
-  padding: 8px 12px;
-  border-radius: 20px;
+  padding: 6px 8px;
+  border-radius: 8px;
   cursor: pointer;
   text-align: center;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.18s ease;
 }
 
 .drawer-cat-pill:hover {
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.drawer-cat-pill.active {
+  background: var(--shv-blue);
   color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
 }
 
 .drawer-cat-pill.active {

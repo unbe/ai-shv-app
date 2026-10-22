@@ -125,7 +125,8 @@ async function getEmagramForecast(stationName, lat, lon) {
       const tempK = tRes.data?.levels[l]?.ensembleMembers?.[0]?.timeSeries?.[t];
       const pressPa = pRes.data?.levels[l]?.ensembleMembers?.[0]?.timeSeries?.[t];
       const qKg = qRes.data?.levels[l]?.ensembleMembers?.[0]?.timeSeries?.[t];
-      const heightM = hRes.data?.levels[l]?.ensembleMembers?.[0]?.timeSeries?.[t];
+      const hSeries = hRes.data?.levels[l]?.ensembleMembers?.[0]?.timeSeries;
+      const heightM = (hSeries && hSeries.length > 1) ? hSeries[t] : (hSeries ? hSeries[0] : 0);
       const uMs = uRes.data?.levels[l]?.ensembleMembers?.[0]?.timeSeries?.[t];
       const vMs = vRes.data?.levels[l]?.ensembleMembers?.[0]?.timeSeries?.[t];
 
