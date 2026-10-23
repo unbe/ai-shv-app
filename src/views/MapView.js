@@ -655,11 +655,12 @@ export class MapView {
     if (layers.webcams) this.webcamsLayer.addTo(this.map);
     if (layers.foehnAxis) this.foehnLayer.addTo(this.map);
 
-    // Dynamic viewport obstacle loading
+    // Dynamic viewport loading for obstacles and international weather stations
     this.map.on('moveend zoomend', () => {
-      clearTimeout(this.obstacleDebounce);
-      this.obstacleDebounce = setTimeout(() => {
-        this.updateObstacles();
+      clearTimeout(this.viewportDebounce);
+      this.viewportDebounce = setTimeout(() => {
+        if (store.state.layers.obstacles) this.updateObstacles();
+        if (store.state.layers.stations) this.renderStations();
       }, 150);
     });
 
@@ -1339,9 +1340,10 @@ export class MapView {
 
   renderStations() {
     this.stationsLayer.clearLayers();
-    if (!this.rawMeasurements || !this.rawMeasurements.features) return;
+    if (!this.rawMeasurements || !this.rawMeasurements.features || !this.map) return;
 
     const isTempMode = store.state.meteoMode === 'TEMPERATURE';
+    const bounds = this.map.getBounds ? this.map.getBounds().pad(0.35) : null;
 
     for (const f of this.rawMeasurements.features) {
       const coords = f.geometry?.coordinates;
@@ -1349,6 +1351,7 @@ export class MapView {
       if (!coords || typeof coords[0] !== 'number' || typeof coords[1] !== 'number' || isNaN(coords[0]) || isNaN(coords[1])) continue;
 
       const latLng = [coords[1], coords[0]];
+      if (bounds && !bounds.contains(latLng)) continue;
 
       if (isTempMode) {
         // Temperature Mode (from WeatherStationProduct / temperature2mValue)

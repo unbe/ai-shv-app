@@ -229,8 +229,26 @@ export function renderBottomSheet(container) {
     const coords = selectedStation.geometry?.coordinates || [0, 0];
     const windSpeedKmH = (p.windSpeedValue !== undefined && p.windSpeedValue !== null) ? Math.round(p.windSpeedValue * 10) / 10 : null;
     const windGustKmH = (p.windGustValue !== undefined && p.windGustValue !== null) ? Math.round(p.windGustValue * 10) / 10 : null;
-    const tempC = p.temperatureValue ? (p.temperatureValue > 200 ? Math.round((p.temperatureValue - 273.15) * 10) / 10 : Math.round(p.temperatureValue * 10) / 10) : null;
+    const rawT = p.temperature2mValue ?? p.temperatureValue;
+    const tempC = (rawT !== null && rawT !== undefined && !isNaN(rawT)) ? (rawT > 200 ? Math.round((rawT - 273.15) * 10) / 10 : Math.round(rawT * 10) / 10) : null;
     const qnh = p.pressureStandardMslValue ? (p.pressureStandardMslValue > 5000 ? Math.round(p.pressureStandardMslValue / 10) : Math.round(p.pressureStandardMslValue)) : null;
+
+    const providerKey = (p.providerKey || p.providerDisplayName || '').toLowerCase();
+    const PROVIDER_LABELS = {
+      meteo_swiss: 'MeteoSchweiz (CH)',
+      meteo_france: 'Météo-France (FR)',
+      geosphere_austria: 'GeoSphere Austria (AT)',
+      dwd: 'Deutscher Wetterdienst (DE)',
+      mistral: 'MISTRAL / ARPA (IT)',
+      slf: 'WSL-SLF (CH)',
+      holfuy: 'Holfuy',
+      aviation_weather: 'Aviation METAR',
+      windline: 'Windline',
+      gx_air_com: 'GXAirCom',
+      open_wind_map: 'OpenWindMap',
+      meteo_oberwallis: 'Meteo Oberwallis (CH)'
+    };
+    const providerBadge = PROVIDER_LABELS[providerKey] || (providerKey ? providerKey.toUpperCase() : 'Live Wetterstation');
 
     container.innerHTML = `
       <div class="sheet-scrim" id="sheet-scrim"></div>
@@ -239,7 +257,7 @@ export function renderBottomSheet(container) {
 
         <div class="sheet-header">
           <div class="sheet-title-group">
-            <span class="sheet-badge badge-station">Live Wetterstation</span>
+            <span class="sheet-badge badge-station">${providerBadge}</span>
             <h2 class="sheet-title">${p.name || 'Wetterstation'}</h2>
             <div class="sheet-meta">
               <span class="meta-item">

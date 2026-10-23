@@ -187,10 +187,15 @@ export class WeatherView {
             </div>
 
             ${this.activeTab === 'stations' ? `
-              <div class="provider-filter-pills">
-                <button data-provider="ALL" class="prov-pill ${this.selectedProvider === 'ALL' ? 'active' : ''}">Alle</button>
+              <div class="provider-filter-pills" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button data-provider="ALL" class="prov-pill ${this.selectedProvider === 'ALL' ? 'active' : ''}">Alle (${stations.length})</button>
                 <button data-provider="meteo_swiss" class="prov-pill ${this.selectedProvider === 'meteo_swiss' ? 'active' : ''}">MeteoSchweiz</button>
+                <button data-provider="meteo_france" class="prov-pill ${this.selectedProvider === 'meteo_france' ? 'active' : ''}">Météo-France</button>
+                <button data-provider="mistral" class="prov-pill ${this.selectedProvider === 'mistral' ? 'active' : ''}">Italien (Mistral)</button>
+                <button data-provider="geosphere_austria" class="prov-pill ${this.selectedProvider === 'geosphere_austria' ? 'active' : ''}">Österreich</button>
+                <button data-provider="dwd" class="prov-pill ${this.selectedProvider === 'dwd' ? 'active' : ''}">DWD Deutschland</button>
                 <button data-provider="slf" class="prov-pill ${this.selectedProvider === 'slf' ? 'active' : ''}">SLF</button>
+                <button data-provider="holfuy" class="prov-pill ${this.selectedProvider === 'holfuy' ? 'active' : ''}">Holfuy</button>
               </div>
             ` : ''}
           </div>
@@ -204,7 +209,7 @@ export class WeatherView {
                 const windGust = (p.windGustValue !== undefined && p.windGustValue !== null) ? Math.round(p.windGustValue) : null;
                 const dir = p.windDirectionValue || 0;
                 const rawT = p.temperature2mValue ?? p.temperatureValue;
-                const temp = rawT ? (rawT > 200 ? Math.round((rawT - 273.15) * 10) / 10 : Math.round(rawT * 10) / 10) : null;
+                const temp = (rawT !== null && rawT !== undefined && !isNaN(rawT)) ? (rawT > 200 ? Math.round((rawT - 273.15) * 10) / 10 : Math.round(rawT * 10) / 10) : null;
                 const rawP = p.pressureMslValue ?? p.pressureStandardMslValue ?? p.pressureSurfaceValue;
                 const press = rawP ? (rawP > 5000 ? Math.round(rawP / 10) : Math.round(rawP)) : null;
 

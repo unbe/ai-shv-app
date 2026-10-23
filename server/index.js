@@ -134,23 +134,31 @@ async function computePairHistory(pairCfg) {
   return history;
 }
 
-// 1. Live Weather Measurements
+// 1. Live Weather Measurements (Switzerland & surrounding Alpine regions: FR, IT, DE, AT)
 app.get('/api/measurements', async (req, res) => {
+  const minLat = req.query.minLat || '43.5';
+  const minLon = req.query.minLon || '4.0';
+  const maxLat = req.query.maxLat || '49.5';
+  const maxLon = req.query.maxLon || '16.0';
+  const countryParam = req.query.country ? `&country=${encodeURIComponent(req.query.country)}` : '';
+
+  const cacheKey = `${minLat}_${minLon}_${maxLat}_${maxLon}_${req.query.country || 'ALL'}`;
   const now = Date.now();
-  if (cache.measurements.data && now - cache.measurements.timestamp < cache.measurements.ttl) {
+  if (cache.measurements.data && cache.measurements.key === cacheKey && now - cache.measurements.timestamp < cache.measurements.ttl) {
     return res.json(cache.measurements.data);
   }
 
   try {
-    const url = 'https://weather-ws-prod.ubmeteo.io/v1/measurements/current?minLat=45.8&minLon=5.9&maxLat=47.8&maxLon=10.5&country=CH';
+    const url = `https://weather-ws-prod.ubmeteo.io/v1/measurements/current?minLat=${minLat}&minLon=${minLon}&maxLat=${maxLat}&maxLon=${maxLon}${countryParam}`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 12000);
     const resp = await fetch(url, { signal: controller.signal });
     clearTimeout(timeout);
 
     if (resp.ok) {
       const json = await resp.json();
       cache.measurements.data = json;
+      cache.measurements.key = cacheKey;
       cache.measurements.timestamp = now;
       return res.json(json);
     }
