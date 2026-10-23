@@ -1349,7 +1349,7 @@ export class MapView {
         if (speedKmH < 3) {
           iconHtml = `
             <div class="station-wind-arrow-box" title="${p.name || ''}: ${speedKmH} km/h">
-              <svg width="18" height="18" viewBox="0 0 26 26" fill="none">
+              <svg class="wind-arrow-svg wind-dot-svg" width="18" height="18" viewBox="0 0 26 26" fill="none">
                 <circle cx="13" cy="13" r="6" fill="#FFFFFF" stroke="#1e293b" stroke-width="1.8"/>
               </svg>
             </div>
@@ -1358,7 +1358,7 @@ export class MapView {
           const arrowColor = getWindColor(speedKmH);
           iconHtml = `
             <div class="station-wind-arrow-box" style="transform: rotate(${dirDeg}deg);" title="${p.name || ''}: ${speedKmH} km/h (${dirDeg}°)">
-              <svg width="24" height="24" viewBox="0 0 26 26" fill="none">
+              <svg class="wind-arrow-svg" width="24" height="24" viewBox="0 0 26 26" fill="none">
                 <g transform="rotate(90 13 13)">
                   <path d="M17.0385 7.68871C17.0204 7.59093 17.1322 7.5226 17.2109 7.58342L24.0393 12.8592C24.0948 12.9023 24.0951 12.9864 24.0401 13.0301L17.2612 18.3763C17.1831 18.4379 17.0707 18.3706 17.0879 18.2726L17.75 14.5068L2.07201 13.6463C1.95761 13.64 1.86757 13.546 1.86691 13.4314L1.86339 12.6785C1.86299 12.564 1.95215 12.4691 2.06649 12.4618L17.7368 11.4541L17.0385 7.68871Z" fill="${arrowColor}" stroke="#1e293b" stroke-width="1.2" stroke-linejoin="round"/>
                 </g>
