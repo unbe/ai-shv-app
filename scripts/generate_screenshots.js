@@ -10,6 +10,10 @@ async function captureAll() {
   console.log('Connecting to Chrome on host via ws://127.0.0.1:9222/devtools/browser ...');
   const browser = await puppeteer.connect({
     browserWSEndpoint: 'ws://127.0.0.1:9222/devtools/browser',
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    wsOptions: {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    },
     defaultViewport: { width: 1440, height: 900, deviceScaleFactor: 2 }
   });
 
@@ -19,14 +23,14 @@ async function captureAll() {
     throw new Error('SHV app page (localhost:3000) not found in browser!');
   }
 
-  await page.bringToFront();
-  await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
-  
   const screenshotsDir = path.join(process.cwd(), 'screenshots');
   if (!fs.existsSync(screenshotsDir)) {
     fs.mkdirSync(screenshotsDir, { recursive: true });
   }
 
+  await page.bringToFront();
+  await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
+  
   // Reload page to start with a pristine state
   console.log('Reloading page for fresh state...');
   await page.reload({ waitUntil: 'networkidle2' });
@@ -60,7 +64,7 @@ async function captureAll() {
         sheet.innerHTML = '';
       }
       // 4. Close any modal backdrops
-      document.querySelectorAll('.modal-overlay, .modal-backdrop').forEach(m => m.remove());
+      document.querySelectorAll('.modal-overlay, .modal-backdrop, .emagram-info-modal-backdrop').forEach(m => m.remove());
     });
     await sleep(400);
   };
@@ -299,9 +303,9 @@ async function captureAll() {
   console.log('-> Saved 13_prognosen_aussichten_karte.png');
 
   // ==========================================
-  // 14. PROGNOSEN: EMAGRAMM SOUNDING
+  // 14. PROGNOSEN: EMAGRAMM STANDORTE KARTE
   // ==========================================
-  console.log('14. Capturing Emagramm Atmospheric Sounding...');
+  console.log('14. Capturing Emagramm Sounding Stations Map...');
   await clearAllOverlays();
   await page.evaluate(() => {
     const emagramTab = document.querySelector('.forecast-tab-btn[data-section="emagram"]');
@@ -309,13 +313,39 @@ async function captureAll() {
     window.scrollTo(0, 0);
   });
   await sleep(1800);
-  await page.screenshot({ path: 'screenshots/14_prognosen_emagramm_sounding.png' });
-  console.log('-> Saved 14_prognosen_emagramm_sounding.png');
+  await page.screenshot({ path: 'screenshots/14_prognosen_emagramm_standorte_karte.png' });
+  console.log('-> Saved 14_prognosen_emagramm_standorte_karte.png');
 
   // ==========================================
-  // 15. PROGNOSEN: ISOBAREN KARTE
+  // 15. PROGNOSEN: EMAGRAMM SOUNDING GRAPH (After Clicking Location)
   // ==========================================
-  console.log('15. Capturing Isobaren Synoptic Chart...');
+  console.log('15. Capturing Emagramm Sounding Graph (Interlaken)...');
+  await page.evaluate(() => {
+    // Click on Interlaken popular station pill
+    const pill = document.querySelector('.popular-station-pill[data-station="Interlaken"]');
+    if (pill) pill.click();
+  });
+  // Wait for sounding data from ICON-CH1 to load and render
+  await sleep(1800);
+  // Expand viewport height and scroll to display the full thermodynamic diagram
+  await page.setViewport({ width: 1440, height: 1150, deviceScaleFactor: 2 });
+  await page.evaluate(() => {
+    const detailBox = document.getElementById('emagram-detail-container');
+    if (detailBox) {
+      detailBox.scrollIntoView({ behavior: 'instant', block: 'start' });
+    }
+  });
+  await sleep(800);
+  await page.screenshot({ path: 'screenshots/15_prognosen_emagramm_sounding_graph.png' });
+  console.log('-> Saved 15_prognosen_emagramm_sounding_graph.png');
+
+  // Reset viewport back to standard 1440x900
+  await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
+
+  // ==========================================
+  // 16. PROGNOSEN: ISOBAREN KARTE
+  // ==========================================
+  console.log('16. Capturing Isobaren Synoptic Chart...');
   await clearAllOverlays();
   await page.evaluate(() => {
     const isobarenTab = document.querySelector('.forecast-tab-btn[data-section="isobaren"]');
@@ -323,21 +353,21 @@ async function captureAll() {
     window.scrollTo(0, 0);
   });
   await sleep(1500);
-  await page.screenshot({ path: 'screenshots/15_prognosen_isobaren_karten.png' });
-  console.log('-> Saved 15_prognosen_isobaren_karten.png');
+  await page.screenshot({ path: 'screenshots/16_prognosen_isobaren_karten.png' });
+  console.log('-> Saved 16_prognosen_isobaren_karten.png');
 
   // ==========================================
-  // 16. SICHERHEIT: DABS, CHECKLIST, FLUGBUCH, VARIO
+  // 17. SICHERHEIT: DABS, CHECKLIST, FLUGBUCH, VARIO
   // ==========================================
-  console.log('16. Capturing Sicherheit, DABS & Flugbuch...');
+  console.log('17. Capturing Sicherheit, DABS & Flugbuch...');
   await clearAllOverlays();
   await page.evaluate(() => {
     if (window.appStore) window.appStore.setTab('safety');
     window.scrollTo(0, 0);
   });
   await sleep(1500);
-  await page.screenshot({ path: 'screenshots/16_sicherheit_dabs_und_flugbuch.png' });
-  console.log('-> Saved 16_sicherheit_dabs_und_flugbuch.png');
+  await page.screenshot({ path: 'screenshots/17_sicherheit_dabs_und_flugbuch.png' });
+  console.log('-> Saved 17_sicherheit_dabs_und_flugbuch.png');
 
   // Reset back to clean map
   await clearAllOverlays();
@@ -351,7 +381,7 @@ async function captureAll() {
   await sleep(800);
 
   browser.disconnect();
-  console.log('All fresh, unobstructed screenshots successfully captured!');
+  console.log('All 17 pristine screenshots successfully captured and saved in screenshots/ !');
 }
 
 captureAll().catch(err => {
