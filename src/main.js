@@ -10,6 +10,11 @@ import { SafetyView } from './views/SafetyView.js';
 import { renderProfileView } from './views/ProfileView.js';
 import { ShvApi } from './services/api.js';
 
+export const storeInstance = store;
+if (typeof window !== 'undefined') {
+  window.appStore = store;
+}
+
 // Global error monitoring to prevent any errors from being swallowed
 window.addEventListener('error', (event) => {
   console.error('[Global Error]', event.error || event.message, {
