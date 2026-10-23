@@ -9,7 +9,7 @@ WORKDIR /app
 
 # Install build dependencies
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install
 
 # Copy source code and configuration files
 COPY index.html vite.config.js ./
@@ -34,7 +34,7 @@ ENV PORT=3000
 
 # Copy package descriptors and install production dependencies only
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 # Copy backend server code and data assets
 COPY server/ ./server/
