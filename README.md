@@ -42,6 +42,43 @@ Interactive flight preparation, meteorological observation, and airspace safety 
 
 ---
 
+## Visual Gallery & Screenshots
+
+Click any image to view in full resolution (2880×1800):
+
+### 1. Interactive Map & Flying Sites
+| Live Map Overview (Takeoffs, Landings & Volten) | Takeoff Site Detail Popup |
+| :---: | :---: |
+| [![Live Map Overview](screenshots/01_fluggebiete_overview.png)](screenshots/01_fluggebiete_overview.png) | [![Takeoff Site Detail](screenshots/02_fluggebiete_startplatz_detail.png)](screenshots/02_fluggebiete_startplatz_detail.png) |
+| **Landevolte (Landing Circuit) Trajectory** | **Map Layer Controls Drawer** |
+| [![Landevolte](screenshots/03_landevolte_circuit_detail.png)](screenshots/03_landevolte_circuit_detail.png) | [![Layer Controls](screenshots/04_karten_ebenen_drawer.png)](screenshots/04_karten_ebenen_drawer.png) |
+| **Swisstopo Satellite Aerial Basemap** | **Aviation Obstacles & Controlled Airspaces** |
+| [![Swisstopo Satellite](screenshots/05_swisstopo_satellit_ortho.png)](screenshots/05_swisstopo_satellit_ortho.png) | [![Obstacles & Airspaces](screenshots/06_hindernisse_und_luftraeume.png)](screenshots/06_hindernisse_und_luftraeume.png) |
+| **Live Wind Arrows (Swiss & Alpine Borders)** | **Wind Station Observation Popup** |
+| [![Wind Arrows](screenshots/07_windstationen_schweiz_international.png)](screenshots/07_windstationen_schweiz_international.png) | [![Wind Station Detail](screenshots/08_windstation_messwerte_popup.png)](screenshots/08_windstation_messwerte_popup.png) |
+
+### 2. Live Weather Observations & Föhn
+| Alpine Föhn & 24h Druckdifferenz Chart | Live Weather Station Observations |
+| :---: | :---: |
+| [![Druckdifferenz & Föhn](screenshots/09_wetter_druckdifferenz_foehn.png)](screenshots/09_wetter_druckdifferenz_foehn.png) | [![Messwerte Stations](screenshots/10_wetter_messwerte_stationen.png)](screenshots/10_wetter_messwerte_stationen.png) |
+
+| Swiss Flying Site Webcams Gallery |
+| :---: |
+| [![Webcams Gallery](screenshots/11_wetter_webcams_uebersicht.png)](screenshots/11_wetter_webcams_uebersicht.png) |
+
+### 3. Meteorological Forecasts & Soundings
+| Alpenwetter Soaring Forecast Bulletins | Aussichten Spatial Map Forecast Overlay |
+| :---: | :---: |
+| [![Alpenwetter Text](screenshots/12_prognosen_alpenwetter_text.png)](screenshots/12_prognosen_alpenwetter_text.png) | [![Aussichten Map Overlay](screenshots/13_prognosen_aussichten_karte.png)](screenshots/13_prognosen_aussichten_karte.png) |
+| **Sounding Stations Map (Previtemps / ICON-CH1)** | **Thermodynamic Emagramm Sounding Graph (Interlaken)** |
+| [![Sounding Stations Map](screenshots/14_prognosen_emagramm_standorte_karte.png)](screenshots/14_prognosen_emagramm_standorte_karte.png) | [![Emagramm Graph](screenshots/15_prognosen_emagramm_sounding_graph.png)](screenshots/15_prognosen_emagramm_sounding_graph.png) |
+
+| Synoptic Surface Pressure Isobar Analysis | Flight Safety & Operations Dashboard |
+| :---: | :---: |
+| [![Isobaren Chart](screenshots/16_prognosen_isobaren_karten.png)](screenshots/16_prognosen_isobaren_karten.png) | [![Safety & Logbook](screenshots/17_sicherheit_dabs_und_flugbuch.png)](screenshots/17_sicherheit_dabs_und_flugbuch.png) |
+
+---
+
 ## Prerequisites
 
 * **Node.js**: v20.x or higher (v22+ supported)
