@@ -2,6 +2,31 @@ import L from 'leaflet';
 import { store } from '../state.js';
 import { ShvApi } from '../services/api.js';
 
+const WIND_BUCKETS = [
+  { max: 3, color: '#FFFFFF' },
+  { max: 6, color: '#D2FFFE' },
+  { max: 10, color: '#8DF0EB' },
+  { max: 15, color: '#43DE5D' },
+  { max: 20, color: '#8CDF17' },
+  { max: 25, color: '#F5DA01' },
+  { max: 30, color: '#FDA700' },
+  { max: 35, color: '#FE6700' },
+  { max: 40, color: '#EA3400' },
+  { max: 50, color: '#D20000' },
+  { max: 60, color: '#A90404' },
+  { max: 70, color: '#DC00DC' },
+  { max: 80, color: '#B000B0' },
+  { max: 100, color: '#8301B2' },
+  { max: Infinity, color: '#550273' }
+];
+
+function getWindColor(speed) {
+  for (const b of WIND_BUCKETS) {
+    if (speed < b.max) return b.color;
+  }
+  return '#550273';
+}
+
 export class MapView {
   constructor(container) {
     this.container = container;
@@ -849,33 +874,40 @@ export class MapView {
   createFlyingSiteMarker(feature, latLng, isLaunch) {
     const p = feature.properties || {};
     const primaryDir = (p.launchDirections && p.launchDirections[0]) || '';
+    const openingStatus = p.openingStatus || 'open';
 
-    // HTML Icon for launch / landing
-    const iconHtml = isLaunch ? `
-      <div class="shv-map-marker marker-launch" title="${p.siteName || ''}">
-        <div class="marker-pin pin-launch">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
-          </svg>
+    let iconHtml = '';
+    if (isLaunch) {
+      const launchDot = openingStatus === 'closed'
+        ? '/assets/sites/dot_closed.png'
+        : (openingStatus === 'open' ? '/assets/sites/dot_open.png' : '/assets/sites/dot_unknown.png');
+      const validDirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      const dirImg = primaryDir && validDirs.includes(primaryDir) ? `/assets/sites/launch_${primaryDir}.png` : null;
+
+      iconHtml = `
+        <div class="shv-site-marker launch-marker" title="${p.siteName || 'Startplatz'}${primaryDir ? ` (${primaryDir})` : ''}">
+          <img src="${launchDot}" alt="Startplatz" class="site-marker-img" />
+          ${dirImg ? `<img src="${dirImg}" class="site-marker-dir-arrow" alt="${primaryDir}" />` : (primaryDir ? `<span class="marker-dir">${primaryDir}</span>` : '')}
         </div>
-        ${primaryDir ? `<span class="marker-dir">${primaryDir}</span>` : ''}
-      </div>
-    ` : `
-      <div class="shv-map-marker marker-landing" title="${p.siteName || ''}">
-        <div class="marker-pin pin-landing">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"></path>
-          </svg>
+      `;
+    } else {
+      const landingImg = openingStatus === 'closed'
+        ? '/assets/sites/landing_closed.png'
+        : (openingStatus === 'open' ? '/assets/sites/landing_open.png' : '/assets/sites/landing_unknown.png');
+
+      iconHtml = `
+        <div class="shv-site-marker landing-marker" title="${p.siteName || 'Landeplatz'}">
+          <img src="${landingImg}" alt="Landeplatz" class="site-marker-img" />
         </div>
-      </div>
-    `;
+      `;
+    }
 
     const icon = L.divIcon({
       className: 'shv-div-icon',
       html: iconHtml,
       iconSize: [32, 32],
-      iconAnchor: [16, 28],
-      popupAnchor: [0, -28],
+      iconAnchor: [16, 16],
+      popupAnchor: [0, -16],
     });
 
     const marker = L.marker(latLng, { icon });
@@ -1308,32 +1340,38 @@ export class MapView {
         this.stationsLayer.addLayer(marker);
 
       } else {
-        // Wind Mode (Wind speed & direction arrows)
+        // Wind Mode (Wind speed & direction arrows, clean arrows with no black oval background)
         if (p.windSpeedValue === undefined || p.windSpeedValue === null) continue;
         const speedKmH = Math.round(p.windSpeedValue);
-        const dirDeg = p.windDirectionValue || 0;
+        const dirDeg = Math.round(p.windDirectionValue || 0);
 
-        let speedClass = 'speed-calm';
-        if (speedKmH >= 35) speedClass = 'speed-storm';
-        else if (speedKmH >= 25) speedClass = 'speed-high';
-        else if (speedKmH >= 15) speedClass = 'speed-mod';
-
-        const iconHtml = `
-          <div class="station-map-pin ${speedClass}" title="${p.name || ''}: ${speedKmH} km/h">
-            <div class="station-arrow" style="transform: rotate(${dirDeg}deg)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2L4 20l8-4 8 4z"/>
+        let iconHtml;
+        if (speedKmH < 3) {
+          iconHtml = `
+            <div class="station-wind-arrow-box" title="${p.name || ''}: ${speedKmH} km/h">
+              <svg width="18" height="18" viewBox="0 0 26 26" fill="none">
+                <circle cx="13" cy="13" r="6" fill="#FFFFFF" stroke="#1e293b" stroke-width="1.8"/>
               </svg>
             </div>
-            <span class="station-speed">${speedKmH}</span>
-          </div>
-        `;
+          `;
+        } else {
+          const arrowColor = getWindColor(speedKmH);
+          iconHtml = `
+            <div class="station-wind-arrow-box" style="transform: rotate(${dirDeg}deg);" title="${p.name || ''}: ${speedKmH} km/h (${dirDeg}°)">
+              <svg width="24" height="24" viewBox="0 0 26 26" fill="none">
+                <g transform="rotate(90 13 13)">
+                  <path d="M17.0385 7.68871C17.0204 7.59093 17.1322 7.5226 17.2109 7.58342L24.0393 12.8592C24.0948 12.9023 24.0951 12.9864 24.0401 13.0301L17.2612 18.3763C17.1831 18.4379 17.0707 18.3706 17.0879 18.2726L17.75 14.5068L2.07201 13.6463C1.95761 13.64 1.86757 13.546 1.86691 13.4314L1.86339 12.6785C1.86299 12.564 1.95215 12.4691 2.06649 12.4618L17.7368 11.4541L17.0385 7.68871Z" fill="${arrowColor}" stroke="#1e293b" stroke-width="1.2" stroke-linejoin="round"/>
+                </g>
+              </svg>
+            </div>
+          `;
+        }
 
         const icon = L.divIcon({
           className: 'station-div-icon',
           html: iconHtml,
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
         });
 
         const marker = L.marker(latLng, { icon });

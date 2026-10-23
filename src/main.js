@@ -70,8 +70,9 @@ class App {
         this.renderShell();
       }
 
-      // Re-render bottom nav if active tab changed
+      // Re-render header & bottom nav if active tab changed
       if (state.activeTab !== this.activeTab) {
+        renderHeader(this.headerContainer);
         renderBottomNav(this.bottomNavContainer);
         this.switchView(state.activeTab);
       }

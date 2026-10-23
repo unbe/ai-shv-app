@@ -4,7 +4,7 @@ export const en = {
   tabs: {
     map: 'Live Map',
     weather: 'Live & Föhn',
-    forecast: 'Soaring Meteo',
+    forecast: 'Forecasts',
     safety: 'Safety & Tools',
     profile: 'SHV Profile'
   },

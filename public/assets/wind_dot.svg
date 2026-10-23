@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="26"
+    height="26"
+    viewBox="0 0 26 26"
+    version="1.1"
+    style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
+>
+    <defs>
+        <filter id="dot_shadow" x="-120%" y="-120%" width="340%" height="340%" filterUnits="objectBoundingBox">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur"/>
+            <feFlood flood-color="#000000" flood-opacity="0.25" result="shadowColor"/>
+            <feComposite in="shadowColor" in2="blur" operator="in" result="shadow"/>
+            <feMerge>
+                <feMergeNode in="shadow"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+    </defs>
+
+    <g filter="url(#dot_shadow)">
+        <g transform="matrix(0.586899,0,0,0.586899,4.63041,5.16592)">
+            <path d="M14.261,4.829C18.963,4.829 22.78,8.646 22.78,13.348C22.78,18.05 18.963,21.868 14.261,21.868C9.559,21.868 5.741,18.05 5.741,13.348C5.741,8.646 9.559,4.829 14.261,4.829ZM14.261,6.533C10.499,6.533 7.445,9.587 7.445,13.348C7.445,17.11 10.499,20.164 14.261,20.164C18.022,20.164 21.076,17.11 21.076,13.348C21.076,9.587 18.022,6.533 14.261,6.533Z" style="fill:#333333;"/>
+        </g>
+        <g transform="matrix(0.469519,0,0,0.469519,6.30433,6.73274)">
+            <circle cx="14.261" cy="13.348" r="8.519" style="fill:#FFFFFF;"/>
+        </g>
+    </g>
+</svg>

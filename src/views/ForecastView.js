@@ -247,7 +247,7 @@ export class ForecastView {
                 <line x1="16" y1="13" x2="8" y2="13"></line>
                 <line x1="16" y1="17" x2="8" y2="17"></line>
               </svg>
-              <span>Textprognosen</span>
+              <span>Flugwetterbericht</span>
             </button>
             <button data-section="outlooks" class="forecast-tab-btn ${this.activeSection === 'outlooks' ? 'active' : ''}">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

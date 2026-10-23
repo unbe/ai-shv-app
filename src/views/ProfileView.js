@@ -235,7 +235,10 @@ export async function renderProfileView(container) {
     : (firstName || lastName || p.companyName || 'SHV Mitglied');
 
   const shvId = p.shvNummer || p.shvNumber || p.extId || '–';
-  const canton = resolveLocalizedString(p.address?.kanton || p.canton || p.address?.ort) || '–';
+  const town = resolveLocalizedString(p.address?.ort || p.ort || p.address?.city) || '';
+  const cantonCode = resolveLocalizedString(p.address?.kanton || p.address?.kantonId || p.canton) || '';
+  const locationLabel = cantonCode && !town ? 'Kanton' : 'Wohnort';
+  const locationValue = town && cantonCode ? `${town} (${cantonCode})` : (town || cantonCode || '–');
 
   // Resolve Category name cleanly
   const rawCat = p.memberships?.[0]?.mitgliedkategorie?.name
@@ -293,8 +296,8 @@ export async function renderProfileView(container) {
                 <span class="card-sub-val">${categoryName}</span>
               </div>
               <div class="footer-col">
-                <span class="card-sub-lbl">Kanton</span>
-                <span class="card-sub-val">${canton}</span>
+                <span class="card-sub-lbl">${locationLabel}</span>
+                <span class="card-sub-val">${locationValue}</span>
               </div>
               <div class="footer-col text-right">
                 <span class="card-sub-lbl">${t.profile.validUntil}</span>
