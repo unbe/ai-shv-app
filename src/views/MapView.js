@@ -30,7 +30,9 @@ export class MapView {
     this.lastObstacleZoom = null;
     this.obstacleReqId = 0;
     this.obstacleAbortController = null;
+    this.obstacleCanvas = L.canvas({ padding: 0.5 });
     this.obstaclesLayer = L.geoJSON(null, {
+      renderer: this.obstacleCanvas,
       pointToLayer: (feature, latlng) => this.renderObstaclePoint(feature, latlng),
       style: (feature) => this.getObstacleStyle(feature),
       onEachFeature: (feature, layer) => {
@@ -586,6 +588,7 @@ export class MapView {
       minZoom: 7,
       maxZoom: 18,
       zoomControl: false,
+      preferCanvas: true,
     });
 
     // Zoom control at bottom right to avoid header collision
@@ -888,43 +891,109 @@ export class MapView {
     const p = feature.properties || {};
     const isEndpoint = ['TRANSMISSION_LINE', 'CABLE_CAR', 'CATENARY', 'BRIDGE'].includes(p.obstacleType);
 
-    let iconUrl = '/assets/obstacles/red_circle.svg';
-    let iconSize = [10, 10];
-    let iconAnchor = [5, 5];
-
     if (isEndpoint) {
       if (p.marking === 'MARKED' || p.obstacleType === 'CATENARY') {
-        iconUrl = '/assets/obstacles/triangle.svg';
-        iconSize = [12, 12];
-        iconAnchor = [6, 6];
+        const marker = L.circleMarker(latlng, {
+          radius: 4.5,
+          color: '#CC0000',
+          fillColor: '#FFD700',
+          fillOpacity: 1,
+          weight: 2,
+          renderer: this.obstacleCanvas
+        });
+        marker.on('click', (e) => {
+          e.originalEvent._shvHandled = true;
+          store.selectObstacle(feature);
+        });
+        return marker;
       } else if (p.obstacleType === 'TRANSMISSION_LINE') {
-        iconUrl = '/assets/obstacles/red_circle.svg';
-        iconSize = [9, 9];
-        iconAnchor = [4.5, 4.5];
+        const marker = L.circleMarker(latlng, {
+          radius: 3.5,
+          color: '#FFFFFF',
+          fillColor: '#CC0000',
+          fillOpacity: 0.9,
+          weight: 1,
+          renderer: this.obstacleCanvas
+        });
+        marker.on('click', (e) => {
+          e.originalEvent._shvHandled = true;
+          store.selectObstacle(feature);
+        });
+        return marker;
       } else {
-        iconUrl = '/assets/obstacles/blue_circle.svg';
-        iconSize = [9, 9];
-        iconAnchor = [4.5, 4.5];
+        const marker = L.circleMarker(latlng, {
+          radius: 3.5,
+          color: '#FFFFFF',
+          fillColor: '#0054FF',
+          fillOpacity: 0.9,
+          weight: 1,
+          renderer: this.obstacleCanvas
+        });
+        marker.on('click', (e) => {
+          e.originalEvent._shvHandled = true;
+          store.selectObstacle(feature);
+        });
+        return marker;
       }
-    } else {
-      const styleId = p.styleId || 'ms_pole';
-      iconUrl = `/assets/obstacles/${styleId}.svg`;
-      if (styleId.includes('tree')) {
-        iconSize = [32, 28];
-        iconAnchor = [16, 26];
-      } else if (styleId.includes('crane')) {
-        iconSize = [28, 28];
-        iconAnchor = [14, 26];
-      } else if (styleId.includes('building')) {
-        iconSize = [24, 24];
-        iconAnchor = [12, 22];
-      } else if (styleId.includes('windmill')) {
-        iconSize = [24, 28];
-        iconAnchor = [12, 26];
-      } else {
-        iconSize = [22, 34];
-        iconAnchor = [11, 32];
+    }
+
+    // Structural point symbols (masts, poles, cranes, trees, windmills, etc.)
+    const zoom = this.map ? this.map.getZoom() : 12;
+    if (zoom < 13) {
+      // Use Canvas circleMarker at lower zooms to maintain 60 FPS without DOM nodes
+      let color = '#F59E0B';
+      let strokeColor = '#D97706';
+      let radius = 4;
+      if (p.styleId?.includes('crane')) {
+        color = '#EF4444';
+        strokeColor = '#DC2626';
+        radius = 4.5;
+      } else if (p.styleId?.includes('windmill')) {
+        color = '#38BDF8';
+        strokeColor = '#0284C7';
+        radius = 4.5;
+      } else if (p.styleId?.includes('tree')) {
+        color = '#22C55E';
+        strokeColor = '#15803D';
+        radius = 3.5;
+      } else if (p.marking === 'MARKED') {
+        color = '#EF4444';
+        strokeColor = '#FFFFFF';
+        radius = 5;
       }
+
+      const marker = L.circleMarker(latlng, {
+        radius,
+        color: strokeColor,
+        fillColor: color,
+        fillOpacity: 0.9,
+        weight: 1.5,
+        renderer: this.obstacleCanvas
+      });
+      marker.on('click', (e) => {
+        e.originalEvent._shvHandled = true;
+        store.selectObstacle(feature);
+      });
+      return marker;
+    }
+
+    // At zoom >= 13 (close-up view), use detailed SVG icons for the few visible structural symbols
+    const styleId = p.styleId || 'ms_pole';
+    let iconUrl = `/assets/obstacles/${styleId}.svg`;
+    let iconSize = [22, 34];
+    let iconAnchor = [11, 32];
+    if (styleId.includes('tree')) {
+      iconSize = [32, 28];
+      iconAnchor = [16, 26];
+    } else if (styleId.includes('crane')) {
+      iconSize = [28, 28];
+      iconAnchor = [14, 26];
+    } else if (styleId.includes('building')) {
+      iconSize = [24, 24];
+      iconAnchor = [12, 22];
+    } else if (styleId.includes('windmill')) {
+      iconSize = [24, 28];
+      iconAnchor = [12, 26];
     }
 
     const icon = L.icon({
@@ -949,11 +1018,12 @@ export class MapView {
       const isMarked = p.marking === 'MARKED';
       const isTransmission = p.obstacleType === 'TRANSMISSION_LINE';
       return {
-        color: isMarked ? '#CC0000' : (isTransmission ? '#0054FF' : '#0054FF'),
+        color: isMarked ? '#CC0000' : (isTransmission ? '#0054FF' : '#CC0000'),
         weight: isTransmission ? 2.5 : 2,
-        opacity: 0.95,
+        opacity: 0.9,
         lineJoin: 'round',
         lineCap: 'round',
+        renderer: this.obstacleCanvas,
       };
     } else if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
       const isAirport = Boolean(p.airport);
@@ -962,9 +1032,10 @@ export class MapView {
         weight: 1.5,
         fillColor: isAirport ? '#FF841B' : '#CC0000',
         fillOpacity: 0.06,
+        renderer: this.obstacleCanvas,
       };
     }
-    return {};
+    return { renderer: this.obstacleCanvas };
   }
 
   bindObstacleEvents(feature, layer) {
@@ -972,15 +1043,6 @@ export class MapView {
       layer.on('click', (e) => {
         e.originalEvent._shvHandled = true;
         store.selectObstacle(feature);
-      });
-      layer.on('mouseover', () => {
-        if (layer.setStyle) layer.setStyle({ weight: 4 });
-      });
-      layer.on('mouseout', () => {
-        if (layer.setStyle) {
-          const p = feature.properties || {};
-          layer.setStyle({ weight: p.obstacleType === 'TRANSMISSION_LINE' ? 2.5 : 2 });
-        }
       });
     }
   }
@@ -1025,8 +1087,8 @@ export class MapView {
     this.lastObstacleZoom = zoom;
 
     const bounds = this.map.getBounds();
-    // Pre-fetch 40% margin around viewport so panning is seamless with no flicker or edge pop-in
-    const padded = bounds.pad(0.4);
+    // Pre-fetch 20% margin around viewport for smooth panning
+    const padded = bounds.pad(0.2);
     const minLon = padded.getWest();
     const maxLon = padded.getEast();
     const minLat = padded.getSouth();
@@ -1044,7 +1106,7 @@ export class MapView {
       if (reqId !== this.obstacleReqId) return;
       if (!data || !Array.isArray(data.features)) return;
 
-      // Incremental addition: add only new features not already in DOM
+      // Incremental addition: add only new features not already in DOM/canvas
       const featuresToAdd = [];
       for (let i = 0; i < data.features.length; i++) {
         const f = data.features[i];
@@ -1061,9 +1123,9 @@ export class MapView {
         });
       }
 
-      // Memory pruning: if accumulated features exceed threshold, prune those far outside view
-      if (this.renderedObstacles.size > 6000) {
-        const pruneBounds = bounds.pad(1.2);
+      // Memory pruning: prune features outside 80% boundary when cache exceeds 2500
+      if (this.renderedObstacles.size > 2500) {
+        const pruneBounds = bounds.pad(0.8);
         for (const [id, item] of this.renderedObstacles.entries()) {
           const latlng = item.latlng;
           if (latlng && !pruneBounds.contains(latlng)) {

@@ -196,26 +196,34 @@ export async function queryObstacles({ minLon, minLat, maxLon, maxLat, zoom = 12
             if (z < 13) continue; // Pylon dots along cables only visible at high zoom >= 13 (per native style.json)
           } else {
             // Structural point symbols (masts, poles, trees, cranes, windmills, etc.)
+            const isMarked = props.marking === 'MARKED';
+            const h = props.maxHeightAgl || 0;
             if (z < 9) {
-              if (props.marking !== 'MARKED' && !(props.maxHeightAgl >= 80 && props.lighting !== 'NONE')) continue;
+              if (!isMarked && h < 80) continue;
             } else if (z < 10) {
-              if (props.marking !== 'MARKED' && props.maxHeightAgl < 60 && props.lighting === 'NONE') continue;
+              if (!isMarked && h < 50) continue;
             } else if (z < 11) {
-              if (props.marking !== 'MARKED' && props.maxHeightAgl < 35 && props.lighting === 'NONE' && props.small) continue;
+              if (!isMarked && h < 30) continue;
             } else if (z < 12) {
-              if (props.small && props.maxHeightAgl < 20 && props.lighting === 'NONE') continue;
+              if (props.small && h < 15 && !isMarked) continue;
             }
           }
           matched.push(f);
         } else if (geomType === 'LineString' || geomType === 'MultiLineString') {
+          const isMarked = props.marking === 'MARKED';
+          const h = props.maxHeightAgl || 0;
           if (z < 9) {
-            if (props.marking !== 'MARKED' && props.maxHeightAgl < 80) continue;
+            // Country overview: only marked hazards, or major high-voltage lines >= 60m
+            if (!isMarked && !(props.obstacleType === 'TRANSMISSION_LINE' && h >= 60)) continue;
           } else if (z < 10) {
-            if (props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR' && props.maxHeightAgl < 50) continue;
+            // Regional overview: marked, transmission lines >= 35m, or cable cars >= 30m
+            if (!isMarked && h < 35) continue;
           } else if (z < 11) {
-            if (props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR' && props.maxHeightAgl < 30) continue;
+            // Intermediate zoom: marked, transmission lines >= 20m, or cable cars >= 15m
+            if (!isMarked && h < 20) continue;
           } else if (z < 12) {
-            if (props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR' && props.maxHeightAgl < 15 && props.small) continue;
+            // Local flight area: marked, transmission lines, cable cars, exclude only tiny local lines < 10m
+            if (!isMarked && h < 10 && props.small) continue;
           }
           matched.push(f);
         }
@@ -225,7 +233,7 @@ export async function queryObstacles({ minLon, minLat, maxLon, maxLat, zoom = 12
 
   // Deterministic safety cap: if the query covers a huge area, prioritize the most critical
   // aviation hazards deterministically so panning NEVER changes feature inclusion randomly
-  const MAX_FEATURES = 6000;
+  const MAX_FEATURES = 2000;
   if (matched.length > MAX_FEATURES) {
     matched.sort((a, b) => {
       // 1. Marked hazards first
@@ -252,9 +260,26 @@ export async function queryObstacles({ minLon, minLat, maxLon, maxLat, zoom = 12
   return {
     type: 'FeatureCollection',
     features: matched.map(f => {
-      // Clean internal temporary _bbox and _uid
-      const { _bbox, _uid, ...rest } = f;
-      return rest;
+      // Clean internal temporary _bbox and _uid, and strip heavy unused properties for network speed
+      const props = f.properties || {};
+      return {
+        type: 'Feature',
+        id: f.id,
+        geometry: f.geometry,
+        properties: {
+          id: props.id || f.id,
+          sourceId: props.sourceId,
+          partIndex: props.partIndex,
+          obstacleType: props.obstacleType,
+          marking: props.marking,
+          lighting: props.lighting,
+          maxHeightAgl: props.maxHeightAgl,
+          topElevationAmsl: props.topElevationAmsl,
+          styleId: props.styleId,
+          airport: props.airport,
+          geometryType: props.geometryType || f.geometry?.type
+        }
+      };
     })
   };
 }
