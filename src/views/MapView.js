@@ -876,28 +876,71 @@ export class MapView {
     const primaryDir = (p.launchDirections && p.launchDirections[0]) || '';
     const openingStatus = p.openingStatus || 'open';
 
+    const COMPASS_DIRS = {
+      N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 90, ESE: 112.5, SE: 135, SSE: 157.5,
+      S: 180, SSW: 202.5, SW: 225, WSW: 247.5, W: 270, WNW: 292.5, NW: 315, NNW: 337.5
+    };
+
     let iconHtml = '';
     if (isLaunch) {
-      const launchDot = openingStatus === 'closed'
-        ? '/assets/sites/dot_closed.png'
-        : (openingStatus === 'open' ? '/assets/sites/dot_open.png' : '/assets/sites/dot_unknown.png');
-      const validDirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-      const dirImg = primaryDir && validDirs.includes(primaryDir) ? `/assets/sites/launch_${primaryDir}.png` : null;
+      // STARTPLATZ (Take-off): Green badge with upward mountain launch peak + directional heading arrow
+      const isClosed = openingStatus === 'closed';
+      const bgColor = isClosed ? '#DC2626' : '#16A34A';
+      const innerColor = isClosed ? '#991B1B' : '#15803D';
+      const dirAngle = COMPASS_DIRS[primaryDir];
+      const hasDir = dirAngle !== undefined;
 
       iconHtml = `
-        <div class="shv-site-marker launch-marker" title="${p.siteName || 'Startplatz'}${primaryDir ? ` (${primaryDir})` : ''}">
-          <img src="${launchDot}" alt="Startplatz" class="site-marker-img" />
-          ${dirImg ? `<img src="${dirImg}" class="site-marker-dir-arrow" alt="${primaryDir}" />` : (primaryDir ? `<span class="marker-dir">${primaryDir}</span>` : '')}
+        <div class="shv-site-marker launch-marker ${isClosed ? 'site-closed' : ''}" title="${p.siteName || 'Startplatz'}${primaryDir ? ` (${primaryDir})` : ''}">
+          ${hasDir ? `
+            <div class="site-marker-dir-arrow" style="transform: rotate(${dirAngle}deg);">
+              <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+                <path d="M17 1.5L21.5 8.5H12.5L17 1.5Z" fill="#FACC15" stroke="#0F172A" stroke-width="1.3" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          ` : ''}
+          <div class="site-marker-core">
+            <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+              <!-- Green launch ring -->
+              <circle cx="16" cy="16" r="14" fill="${bgColor}" stroke="#0F172A" stroke-width="2"/>
+              <circle cx="16" cy="16" r="11" fill="${innerColor}"/>
+              ${isClosed ? `
+                <line x1="10" y1="10" x2="22" y2="22" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="22" y1="10" x2="10" y2="22" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+              ` : `
+                <!-- Mountain Launch Peak Icon -->
+                <path d="M16 7L24 21H8L16 7Z" fill="white" stroke="#0F172A" stroke-width="1.2" stroke-linejoin="round"/>
+                <path d="M16 11.5L20.5 21H11.5L16 11.5Z" fill="#86EFAC"/>
+              `}
+            </svg>
+          </div>
         </div>
       `;
     } else {
-      const landingImg = openingStatus === 'closed'
-        ? '/assets/sites/landing_closed.png'
-        : (openingStatus === 'open' ? '/assets/sites/landing_open.png' : '/assets/sites/landing_unknown.png');
+      // LANDEPLATZ (Landing): Aviation Blue disc with white-and-red striped Windsock
+      const isClosed = openingStatus === 'closed';
+      const bgColor = isClosed ? '#DC2626' : '#0284C7';
+      const innerColor = isClosed ? '#991B1B' : '#0369A1';
 
       iconHtml = `
-        <div class="shv-site-marker landing-marker" title="${p.siteName || 'Landeplatz'}">
-          <img src="${landingImg}" alt="Landeplatz" class="site-marker-img" />
+        <div class="shv-site-marker landing-marker ${isClosed ? 'site-closed' : ''}" title="${p.siteName || 'Landeplatz'}">
+          <div class="site-marker-core">
+            <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+              <!-- Blue landing disc -->
+              <circle cx="16" cy="16" r="14" fill="${bgColor}" stroke="#0F172A" stroke-width="2"/>
+              <circle cx="16" cy="16" r="11" fill="${innerColor}"/>
+              ${isClosed ? `
+                <line x1="10" y1="10" x2="22" y2="22" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="22" y1="10" x2="10" y2="22" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+              ` : `
+                <!-- Authentic Paragliding Windsock -->
+                <line x1="9.5" y1="7" x2="9.5" y2="25" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                <path d="M9.5 8.5L23.5 11.2V17.8L9.5 20.5V8.5Z" fill="white" stroke="#0F172A" stroke-width="1.2" stroke-linejoin="round"/>
+                <path d="M13.8 9.3L13.8 19.7L17.5 19L17.5 10L13.8 9.3Z" fill="#EF4444"/>
+                <path d="M20.8 10.7L20.8 18.3L23.5 17.8V11.2L20.8 10.7Z" fill="#EF4444"/>
+              `}
+            </svg>
+          </div>
         </div>
       `;
     }
@@ -905,9 +948,9 @@ export class MapView {
     const icon = L.divIcon({
       className: 'shv-div-icon',
       html: iconHtml,
-      iconSize: [32, 32],
-      iconAnchor: [16, 16],
-      popupAnchor: [0, -16],
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+      popupAnchor: [0, -17],
     });
 
     const marker = L.marker(latLng, { icon });

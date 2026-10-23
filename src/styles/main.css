@@ -1171,8 +1171,8 @@ body {
 /* Authentic Flying Site Markers (Paraglider/Hangglider Launches & Landings) */
 .shv-site-marker {
   position: relative;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1186,21 +1186,27 @@ body {
   z-index: 1000 !important;
 }
 
-.site-marker-img {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-  display: block;
+.site-marker-core {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  position: relative;
+  z-index: 2;
 }
 
 .site-marker-dir-arrow {
   position: absolute;
   top: 0;
   left: 0;
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
+  width: 34px;
+  height: 34px;
   pointer-events: none;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Authentic Wind Station Arrow Markers */
