@@ -28,8 +28,111 @@ const cache = {
   outlooks: { data: null, timestamp: 0, ttl: 15 * 60 * 1000 },
 };
 
-// Real historical measurements buffer for Gotthard pressure difference
+// Real historical measurements buffer & pair timeseries cache
 const foehnRealHistory = [];
+const pairHistoryCache = {};
+
+async function fetchStationTimeseries(stationId, params = 'wind_speed,wind_direction,wind_gust,temperature,pressure_msl,relative_humidity') {
+  const now = Date.now();
+  if (cache.timeseries[stationId] && (now - cache.timeseries[stationId].timestamp < 3 * 60 * 1000)) {
+    return cache.timeseries[stationId].data;
+  }
+
+  try {
+    const url = `https://weather-ws-prod.ubmeteo.io/v1/measurements/timeseries/${encodeURIComponent(stationId)}?parameters=${params}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (SHV-FSVL-App/1.0)' },
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (resp.ok) {
+      const data = await resp.json();
+      cache.timeseries[stationId] = { data, timestamp: now };
+      return data;
+    }
+    throw new Error(`Upstream timeseries returned ${resp.status}`);
+  } catch (err) {
+    console.error(`[Server] Timeseries error (${stationId}):`, err.message);
+    if (cache.timeseries[stationId]?.data) {
+      return cache.timeseries[stationId].data;
+    }
+    return null;
+  }
+}
+
+async function computePairHistory(pairCfg) {
+  if (!pairCfg) return [];
+  const cacheKey = pairCfg.id;
+  const now = Date.now();
+  if (pairHistoryCache[cacheKey] && (now - pairHistoryCache[cacheKey].timestamp < 3 * 60 * 1000)) {
+    return pairHistoryCache[cacheKey].history;
+  }
+
+  const param = pairCfg.isPressure ? 'pressure_msl' : 'temperature';
+  const [data1, data2] = await Promise.all([
+    fetchStationTimeseries(pairCfg.startId, param),
+    fetchStationTimeseries(pairCfg.endId, param)
+  ]);
+
+  const s1 = data1?.timeseries?.find(t => t.parameter === param)?.measurements || [];
+  const s2 = data2?.timeseries?.find(t => t.parameter === param)?.measurements || [];
+
+  if (s1.length === 0 || s2.length === 0) {
+    if (pairHistoryCache[cacheKey]?.history) {
+      return pairHistoryCache[cacheKey].history;
+    }
+    return [];
+  }
+
+  const map1 = new Map();
+  for (const m of s1) {
+    if (m.time && m.value !== null && m.value !== undefined) {
+      map1.set(m.time, m.value);
+    }
+  }
+
+  const cutoff = now - 24 * 3600 * 1000;
+  const history = [];
+
+  for (const m2 of s2) {
+    if (m2.time >= cutoff && map1.has(m2.time)) {
+      const v1 = map1.get(m2.time);
+      const v2 = m2.value;
+      if (v2 === null || v2 === undefined) continue;
+
+      let delta;
+      if (pairCfg.isPressure) {
+        delta = (pairCfg.id === 'GVE_GUT')
+          ? Math.round((v1 - v2) * 10) / 10
+          : Math.round((v2 - v1) * 10) / 10;
+      } else {
+        const c1 = v1 > 200 ? v1 - 273.15 : v1;
+        const c2 = v2 > 200 ? v2 - 273.15 : v2;
+        delta = Math.round((c1 - c2) * 10) / 10;
+      }
+
+      const d = new Date(m2.time);
+      const timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+      history.push({
+        time: timeStr,
+        timestamp: m2.time,
+        diffHpa: delta,
+        unit: pairCfg.unit,
+      });
+    }
+  }
+
+  if (history.length > 0) {
+    pairHistoryCache[cacheKey] = { history, timestamp: now };
+  } else if (pairHistoryCache[cacheKey]?.history) {
+    return pairHistoryCache[cacheKey].history;
+  }
+
+  return history;
+}
 
 // 1. Live Weather Measurements
 app.get('/api/measurements', async (req, res) => {
@@ -322,24 +425,31 @@ app.get('/api/foehn', async (req, res) => {
       }
     }
 
-    // Historical Buffer for Gotthard transect
+    // Compute real 24h verlauf history for the requested pair (or Gotthard by default)
+    const reqPairId = req.query.pair || 'KLO_LUG';
+    const targetPairCfg = pairConfigs.find(p => p.id === reqPairId) || pairConfigs[0];
     const gotthardPair = pairs.find(p => p.id === 'KLO_LUG');
-    const diffGotthard = gotthardPair ? gotthardPair.delta : 0;
 
-    const nowTs = Date.now();
-    const lastSample = foehnRealHistory[foehnRealHistory.length - 1];
-    if (!lastSample || nowTs - lastSample.timestamp >= 5 * 60 * 1000) {
-      const nowD = new Date();
-      const timeStr = `${nowD.getHours().toString().padStart(2, '0')}:${nowD.getMinutes().toString().padStart(2, '0')}`;
-      foehnRealHistory.push({ time: timeStr, diffHpa: diffGotthard, timestamp: nowTs });
-      while (foehnRealHistory.length > 0 && nowTs - foehnRealHistory[0].timestamp > 24 * 3600 * 1000) {
-        foehnRealHistory.shift();
+    let history = await computePairHistory(targetPairCfg);
+
+    // Fallback if upstream timeseries is temporarily empty or unreachable
+    if (!history || history.length === 0) {
+      const activeP = pairs.find(p => p.id === targetPairCfg.id);
+      const curDelta = activeP ? activeP.delta : (gotthardPair ? gotthardPair.delta : 0);
+      const nowTs = Date.now();
+      const lastSample = foehnRealHistory[foehnRealHistory.length - 1];
+      if (!lastSample || nowTs - lastSample.timestamp >= 5 * 60 * 1000) {
+        const nowD = new Date();
+        const timeStr = `${nowD.getHours().toString().padStart(2, '0')}:${nowD.getMinutes().toString().padStart(2, '0')}`;
+        foehnRealHistory.push({ time: timeStr, diffHpa: curDelta, timestamp: nowTs, unit: targetPairCfg.unit });
+        while (foehnRealHistory.length > 0 && nowTs - foehnRealHistory[0].timestamp > 24 * 3600 * 1000) {
+          foehnRealHistory.shift();
+        }
+      } else if (curDelta !== null) {
+        lastSample.diffHpa = curDelta;
       }
-    } else if (diffGotthard !== null) {
-      lastSample.diffHpa = diffGotthard;
+      history = foehnRealHistory.map(h => ({ time: h.time, timestamp: h.timestamp, diffHpa: h.diffHpa, unit: h.unit }));
     }
-
-    const history = foehnRealHistory.map(h => ({ time: h.time, diffHpa: h.diffHpa }));
 
     return res.json({
       primaryPair: gotthardPair ? {
@@ -443,32 +553,12 @@ app.get('/api/measurements/timeseries/:id', async (req, res) => {
   const stationId = req.params.id;
   if (!stationId) return res.status(400).json({ error: 'Missing station identifier' });
 
-  const now = Date.now();
-  if (cache.timeseries[stationId] && (now - cache.timeseries[stationId].timestamp < 2 * 60 * 1000)) {
-    return res.json(cache.timeseries[stationId].data);
+  const params = req.query.parameters || 'wind_speed,wind_direction,wind_gust,temperature,pressure_msl,relative_humidity';
+  const data = await fetchStationTimeseries(stationId, params);
+  if (data) {
+    return res.json(data);
   }
-
-  try {
-    const params = 'wind_speed,wind_direction,wind_gust,temperature,pressure_msl,relative_humidity';
-    const url = `https://weather-ws-prod.ubmeteo.io/v1/measurements/timeseries/${encodeURIComponent(stationId)}?parameters=${params}`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const resp = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
-
-    if (resp.ok) {
-      const data = await resp.json();
-      cache.timeseries[stationId] = { data, timestamp: now };
-      return res.json(data);
-    }
-    throw new Error(`Upstream timeseries returned ${resp.status}`);
-  } catch (err) {
-    console.error(`[Server] Timeseries error (${stationId}):`, err.message);
-    if (cache.timeseries[stationId]?.data) {
-      return res.json(cache.timeseries[stationId].data);
-    }
-    return res.status(503).json({ error: 'Stations-Zeitreihe vorübergehend nicht erreichbar' });
-  }
+  return res.status(503).json({ error: 'Stations-Zeitreihe vorübergehend nicht erreichbar' });
 });
 
 // 7. Aerological Soundings / Emagram Calculation via Python

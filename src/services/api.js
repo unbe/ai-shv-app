@@ -50,7 +50,7 @@ export class ShvApi {
     }
   }
 
-  static async getObstacles({ minLon, minLat, maxLon, maxLat, zoom }) {
+  static async getObstacles({ minLon, minLat, maxLon, maxLat, zoom }, options = {}) {
     try {
       const q = new URLSearchParams({
         minLon,
@@ -59,11 +59,14 @@ export class ShvApi {
         maxLat,
         zoom: Math.round(zoom || 12)
       });
-      const resp = await fetch(`/api/obstacles?${q.toString()}`);
+      const resp = await fetch(`/api/obstacles?${q.toString()}`, {
+        signal: options.signal
+      });
       if (resp.ok) {
         return await resp.json();
       }
     } catch (err) {
+      if (err.name === 'AbortError') throw err;
       console.warn('[ShvApi.getObstacles] Fetch failed:', err);
     }
     return { type: 'FeatureCollection', features: [] };
@@ -114,9 +117,10 @@ export class ShvApi {
     return null;
   }
 
-  static async getFoehn() {
+  static async getFoehn(pairId = null) {
     try {
-      const resp = await fetch('/api/foehn');
+      const url = pairId ? `/api/foehn?pair=${encodeURIComponent(pairId)}` : '/api/foehn';
+      const resp = await fetch(url);
       if (resp.ok) return await resp.json();
       console.error('[ShvApi.getFoehn] HTTP error:', resp.status, resp.statusText);
     } catch (e) {

@@ -83,6 +83,14 @@ export async function ensureObstaclesLoaded() {
   return initPromise;
 }
 
+function getFeatureKey(f, index = 0) {
+  const p = f.properties || {};
+  const base = p.sourceId || f.id || p.id || `feat_${index}`;
+  const type = f.geometry?.type || 'geom';
+  const part = p.partIndex !== null && p.partIndex !== undefined ? `_${p.partIndex}` : '';
+  return `${base}_${type}${part}`;
+}
+
 function buildSpatialIndex(features) {
   const grid = new Map();
 
@@ -109,7 +117,7 @@ function buildSpatialIndex(features) {
       geom.coordinates.forEach(l => l.forEach(addPt));
     }
 
-    f._uid = f.properties?.sourceId || `${f.id || 'feat'}_${i}`;
+    f._uid = getFeatureKey(f, i);
     f._bbox = [minX, minY, maxX, maxY];
 
     // 0.1° grid cells (~7 x 11 km)
@@ -135,7 +143,9 @@ function buildSpatialIndex(features) {
 }
 
 /**
- * Query obstacles intersecting a bounding box with zoom-level LOD filtering
+ * Query obstacles intersecting a bounding box with zoom-level LOD filtering.
+ * Features are returned deterministically without random round-robin sampling,
+ * preventing flickering or obstacles vanishing when panning.
  */
 export async function queryObstacles({ minLon, minLat, maxLon, maxLat, zoom = 12 }) {
   await ensureObstaclesLoaded();
@@ -144,10 +154,6 @@ export async function queryObstacles({ minLon, minLat, maxLon, maxLat, zoom = 12
   }
 
   const z = parseFloat(zoom) || 12;
-  const isDetail = z >= 13;       // Red dot endpoints along cables
-  const isLocal = z >= 12;        // Local flight sites
-  const isRegional = z >= 10;     // Regional view
-  const isOverview = z >= 8;      // Country overview
 
   if (z < 7) {
     return { type: 'FeatureCollection', features: [] };
@@ -158,81 +164,89 @@ export async function queryObstacles({ minLon, minLat, maxLon, maxLat, zoom = 12
   const gy0 = Math.floor(minLat * 10);
   const gy1 = Math.floor(maxLat * 10);
 
-  // Find all cells that actually contain data in this bounding box
-  const activeCells = [];
-  for (let gx = gx0; gx <= gx1; gx++) {
-    for (let gy = gy0; gy <= gy1; gy++) {
-      const cell = spatialGrid.get(`${gx}_${gy}`);
-      if (cell && cell.length > 0) {
-        activeCells.push(cell);
-      }
-    }
-  }
-
-  // Filter features within each active cell by bbox and zoom LOD
-  const cellCandidates = [];
-  for (const cell of activeCells) {
-    const list = [];
-    for (let i = 0; i < cell.length; i++) {
-      const f = cell[i];
-      const [bMinX, bMinY, bMaxX, bMaxY] = f._bbox;
-      if (bMaxX < minLon || bMinX > maxLon || bMaxY < minLat || bMinY > maxLat) {
-        continue;
-      }
-
-      const geomType = f.geometry?.type;
-      const props = f.properties || {};
-
-      // Multi-level zoom LOD filtering derived from Android APK style.json:
-      if (geomType === 'Point') {
-        const isEndpoint = ['TRANSMISSION_LINE', 'CABLE_CAR', 'CATENARY', 'BRIDGE'].includes(props.obstacleType);
-        if (isEndpoint) {
-          if (!isDetail) continue; // Cable pylon endpoint dots only at zoom >= 13
-        } else {
-          if (z < 9 && (props.maxHeightAgl < 70 && props.lighting === 'NONE')) continue;
-          if (z < 11 && (props.maxHeightAgl < 30 && props.lighting === 'NONE')) continue;
-          if (z < 12 && (props.small && props.lighting === 'NONE')) continue;
-        }
-      } else if (geomType === 'LineString' || geomType === 'Polygon') {
-        if (z < 9) {
-          if (props.maxHeightAgl < 50 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
-        } else if (z < 11) {
-          if (props.maxHeightAgl < 25 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
-        } else if (z < 12) {
-          if (props.small && props.maxHeightAgl < 15 && props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR') continue;
-        }
-      }
-      list.push(f);
-    }
-    if (list.length > 0) {
-      cellCandidates.push(list);
-    }
-  }
-
-  // Fair Round-Robin distribution across all spatial cells
-  // This guarantees West, Central, and East Switzerland all receive equal representation without any longitude starvation
-  const TARGET_MAX = 2000;
   const seen = new Set();
   const matched = [];
 
-  let round = 0;
-  let addedInRound = true;
+  for (let gx = gx0; gx <= gx1; gx++) {
+    for (let gy = gy0; gy <= gy1; gy++) {
+      const cell = spatialGrid.get(`${gx}_${gy}`);
+      if (!cell) continue;
 
-  while (matched.length < TARGET_MAX && addedInRound) {
-    addedInRound = false;
-    for (let c = 0; c < cellCandidates.length; c++) {
-      const list = cellCandidates[c];
-      if (round < list.length) {
-        const f = list[round];
-        if (!seen.has(f._uid)) {
-          seen.add(f._uid);
+      for (let i = 0; i < cell.length; i++) {
+        const f = cell[i];
+        if (seen.has(f._uid)) continue;
+        seen.add(f._uid);
+
+        const [bMinX, bMinY, bMaxX, bMaxY] = f._bbox;
+        if (bMaxX < minLon || bMinX > maxLon || bMaxY < minLat || bMinY > maxLat) {
+          continue;
+        }
+
+        const geomType = f.geometry?.type;
+        const props = f.properties || {};
+
+        if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
           matched.push(f);
-          addedInRound = true;
-          if (matched.length >= TARGET_MAX) break;
+          continue;
+        }
+
+        if (geomType === 'Point') {
+          const isEndpoint = ['TRANSMISSION_LINE', 'CABLE_CAR', 'CATENARY', 'BRIDGE'].includes(props.obstacleType);
+          if (isEndpoint) {
+            if (z < 13) continue; // Pylon dots along cables only visible at high zoom >= 13 (per native style.json)
+          } else {
+            // Structural point symbols (masts, poles, trees, cranes, windmills, etc.)
+            if (z < 9) {
+              if (props.marking !== 'MARKED' && !(props.maxHeightAgl >= 80 && props.lighting !== 'NONE')) continue;
+            } else if (z < 10) {
+              if (props.marking !== 'MARKED' && props.maxHeightAgl < 60 && props.lighting === 'NONE') continue;
+            } else if (z < 11) {
+              if (props.marking !== 'MARKED' && props.maxHeightAgl < 35 && props.lighting === 'NONE' && props.small) continue;
+            } else if (z < 12) {
+              if (props.small && props.maxHeightAgl < 20 && props.lighting === 'NONE') continue;
+            }
+          }
+          matched.push(f);
+        } else if (geomType === 'LineString' || geomType === 'MultiLineString') {
+          if (z < 9) {
+            if (props.marking !== 'MARKED' && props.maxHeightAgl < 80) continue;
+          } else if (z < 10) {
+            if (props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR' && props.maxHeightAgl < 50) continue;
+          } else if (z < 11) {
+            if (props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR' && props.maxHeightAgl < 30) continue;
+          } else if (z < 12) {
+            if (props.marking !== 'MARKED' && props.obstacleType !== 'CABLE_CAR' && props.maxHeightAgl < 15 && props.small) continue;
+          }
+          matched.push(f);
         }
       }
     }
-    round++;
+  }
+
+  // Deterministic safety cap: if the query covers a huge area, prioritize the most critical
+  // aviation hazards deterministically so panning NEVER changes feature inclusion randomly
+  const MAX_FEATURES = 6000;
+  if (matched.length > MAX_FEATURES) {
+    matched.sort((a, b) => {
+      // 1. Marked hazards first
+      const markedA = a.properties?.marking === 'MARKED' ? 1 : 0;
+      const markedB = b.properties?.marking === 'MARKED' ? 1 : 0;
+      if (markedB !== markedA) return markedB - markedA;
+
+      // 2. Cable cars next
+      const cableA = a.properties?.obstacleType === 'CABLE_CAR' ? 1 : 0;
+      const cableB = b.properties?.obstacleType === 'CABLE_CAR' ? 1 : 0;
+      if (cableB !== cableA) return cableB - cableA;
+
+      // 3. Taller obstacles first
+      const hA = a.properties?.maxHeightAgl || 0;
+      const hB = b.properties?.maxHeightAgl || 0;
+      if (hB !== hA) return hB - hA;
+
+      // 4. Stable tie-breaker: unique id
+      return a._uid < b._uid ? -1 : 1;
+    });
+    matched.length = MAX_FEATURES;
   }
 
   return {

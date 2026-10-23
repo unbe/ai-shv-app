@@ -26,10 +26,24 @@ export class MapView {
       },
       onEachFeature: (feature, layer) => this.bindWildschutzEvents(feature, layer),
     });
+    this.renderedObstacles = new Map();
+    this.lastObstacleZoom = null;
+    this.obstacleReqId = 0;
+    this.obstacleAbortController = null;
     this.obstaclesLayer = L.geoJSON(null, {
       pointToLayer: (feature, latlng) => this.renderObstaclePoint(feature, latlng),
       style: (feature) => this.getObstacleStyle(feature),
-      onEachFeature: (feature, layer) => this.bindObstacleEvents(feature, layer),
+      onEachFeature: (feature, layer) => {
+        const id = this.getObstacleId(feature);
+        let centerLatLng = null;
+        if (feature.geometry?.type === 'Point') {
+          centerLatLng = L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]);
+        } else if (layer.getBounds) {
+          centerLatLng = layer.getBounds().getCenter();
+        }
+        this.renderedObstacles.set(id, { layer, latlng: centerLatLng });
+        this.bindObstacleEvents(feature, layer);
+      },
     });
     this.obstacleDebounce = null;
     this.stationsLayer = L.layerGroup();
@@ -971,10 +985,19 @@ export class MapView {
     }
   }
 
+  getObstacleId(feature) {
+    const p = feature.properties || {};
+    const base = p.sourceId || feature.id || p.id || 'obs';
+    const type = feature.geometry?.type || 'geom';
+    const part = p.partIndex !== null && p.partIndex !== undefined ? `_${p.partIndex}` : '';
+    return `${base}_${type}${part}`;
+  }
+
   async updateObstacles() {
     if (!this.map || !store.state.layers.obstacles) {
       if (this.obstaclesLayer && this.map?.hasLayer(this.obstaclesLayer)) {
         this.obstaclesLayer.clearLayers();
+        this.renderedObstacles?.clear();
         this.map.removeLayer(this.obstaclesLayer);
       }
       return;
@@ -984,27 +1007,73 @@ export class MapView {
       this.obstaclesLayer.addTo(this.map);
     }
 
-    const bounds = this.map.getBounds();
     const zoom = this.map.getZoom();
 
-    // At very broad overview scale (z < 8), clear obstacles
+    // At broad overview scale (z < 8), clear obstacles
     if (zoom < 8) {
       this.obstaclesLayer.clearLayers();
+      this.renderedObstacles?.clear();
       return;
     }
 
-    const minLon = bounds.getWest() - 0.02;
-    const maxLon = bounds.getEast() + 0.02;
-    const minLat = bounds.getSouth() - 0.01;
-    const maxLat = bounds.getNorth() + 0.01;
+    // When zooming across integer LOD tiers, clear existing obstacles so new zoom-appropriate features are loaded
+    const currentTier = Math.floor(zoom);
+    if (this.lastObstacleZoom !== null && Math.abs(currentTier - Math.floor(this.lastObstacleZoom)) >= 1) {
+      this.obstaclesLayer.clearLayers();
+      this.renderedObstacles?.clear();
+    }
+    this.lastObstacleZoom = zoom;
+
+    const bounds = this.map.getBounds();
+    // Pre-fetch 40% margin around viewport so panning is seamless with no flicker or edge pop-in
+    const padded = bounds.pad(0.4);
+    const minLon = padded.getWest();
+    const maxLon = padded.getEast();
+    const minLat = padded.getSouth();
+    const maxLat = padded.getNorth();
+
+    const reqId = ++this.obstacleReqId;
+    if (this.obstacleAbortController) {
+      this.obstacleAbortController.abort();
+    }
+    this.obstacleAbortController = new AbortController();
+    const signal = this.obstacleAbortController.signal;
 
     try {
-      const data = await ShvApi.getObstacles({ minLon, minLat, maxLon, maxLat, zoom });
+      const data = await ShvApi.getObstacles({ minLon, minLat, maxLon, maxLat, zoom }, { signal });
+      if (reqId !== this.obstacleReqId) return;
       if (!data || !Array.isArray(data.features)) return;
 
-      this.obstaclesLayer.clearLayers();
-      this.obstaclesLayer.addData(data);
+      // Incremental addition: add only new features not already in DOM
+      const featuresToAdd = [];
+      for (let i = 0; i < data.features.length; i++) {
+        const f = data.features[i];
+        const id = this.getObstacleId(f);
+        if (!this.renderedObstacles.has(id)) {
+          featuresToAdd.push(f);
+        }
+      }
+
+      if (featuresToAdd.length > 0) {
+        this.obstaclesLayer.addData({
+          type: 'FeatureCollection',
+          features: featuresToAdd
+        });
+      }
+
+      // Memory pruning: if accumulated features exceed threshold, prune those far outside view
+      if (this.renderedObstacles.size > 6000) {
+        const pruneBounds = bounds.pad(1.2);
+        for (const [id, item] of this.renderedObstacles.entries()) {
+          const latlng = item.latlng;
+          if (latlng && !pruneBounds.contains(latlng)) {
+            this.obstaclesLayer.removeLayer(item.layer);
+            this.renderedObstacles.delete(id);
+          }
+        }
+      }
     } catch (err) {
+      if (err.name === 'AbortError') return;
       console.warn('[MapView.updateObstacles] Error fetching obstacles:', err);
     }
   }
@@ -1347,6 +1416,13 @@ export class MapView {
       if (isVisible && !this.map.hasLayer(layer)) {
         this.map.addLayer(layer);
       } else if (!isVisible && this.map.hasLayer(layer)) {
+        if (layer === this.obstaclesLayer) {
+          this.obstaclesLayer.clearLayers();
+          this.renderedObstacles?.clear();
+          if (this.obstacleAbortController) {
+            this.obstacleAbortController.abort();
+          }
+        }
         this.map.removeLayer(layer);
       }
     };

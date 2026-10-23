@@ -2,6 +2,81 @@ import L from 'leaflet';
 import { store } from '../state.js';
 import { ShvApi } from '../services/api.js';
 
+// =========================================================================
+// Official Ubique / MeteoSchweiz Days Overview Color Palettes & Bounding Box
+// Derived directly from Android APK decompilation (ff1.l, ff1.m, jc4, l22)
+// =========================================================================
+
+// Color ramp for RELATIVE_SUNSHINE (0 - 100%)
+const SUNSHINE_PALETTE = [
+  { p: 0, r: 255, g: 255, b: 255, a: 0 },    // 0% is transparent
+  { p: 5, r: 255, g: 248, b: 219, a: 160 },  // #FFF8DB
+  { p: 15, r: 255, g: 237, b: 170, a: 175 }, // #FFEDAA
+  { p: 25, r: 255, g: 226, b: 112, a: 190 }, // #FFE270
+  { p: 35, r: 255, g: 208, b: 82, a: 205 },  // #FFD052
+  { p: 45, r: 255, g: 190, b: 51, a: 215 },  // #FFBE33
+  { p: 55, r: 255, g: 151, b: 26, a: 225 },  // #FF971A
+  { p: 65, r: 255, g: 111, b: 0, a: 235 },   // #FF6F00
+  { p: 75, r: 255, g: 85, b: 0, a: 240 },    // #FF5500
+  { p: 85, r: 235, g: 9, b: 0, a: 245 },     // #EB0900
+  { p: 95, r: 204, g: 0, b: 68, a: 250 },    // #CC0044
+  { p: 100, r: 180, g: 0, b: 50, a: 255 }
+];
+
+// Color ramp for PRECIPITATION_PROBABILITY (WEAK & STRONG) (0 - 100%)
+const PRECIP_PALETTE = [
+  { p: 0, r: 255, g: 255, b: 255, a: 0 },    // 0% is transparent
+  { p: 5, r: 199, g: 237, b: 210, a: 160 },  // #C7EDD2
+  { p: 15, r: 171, g: 228, b: 188, a: 175 }, // #ABE4BC
+  { p: 25, r: 142, g: 220, b: 166, a: 190 }, // #8EDCA6
+  { p: 35, r: 114, g: 211, b: 143, a: 205 }, // #72D38F
+  { p: 45, r: 86, g: 202, b: 121, a: 215 },  // #56CA79
+  { p: 55, r: 61, g: 202, b: 116, a: 225 },  // #3DCA74
+  { p: 65, r: 45, g: 194, b: 115, a: 235 },  // #2DC273
+  { p: 75, r: 34, g: 179, b: 116, a: 240 },  // #22B374
+  { p: 85, r: 26, g: 163, b: 115, a: 245 },  // #1AA373
+  { p: 95, r: 18, g: 146, b: 112, a: 250 },  // #129270
+  { p: 100, r: 10, g: 120, b: 90, a: 255 }
+];
+
+function buildColorLut(palette) {
+  const lut = new Uint8ClampedArray(256 * 4);
+  for (let g = 0; g < 256; g++) {
+    const pct = (g / 255.0) * 100.0;
+    if (pct <= 0) {
+      lut[g * 4] = 0;
+      lut[g * 4 + 1] = 0;
+      lut[g * 4 + 2] = 0;
+      lut[g * 4 + 3] = 0;
+      continue;
+    }
+    let idx = 0;
+    while (idx < palette.length - 1 && palette[idx + 1].p <= pct) {
+      idx++;
+    }
+    if (idx >= palette.length - 1) {
+      const last = palette[palette.length - 1];
+      lut[g * 4] = last.r;
+      lut[g * 4 + 1] = last.g;
+      lut[g * 4 + 2] = last.b;
+      lut[g * 4 + 3] = last.a;
+    } else {
+      const p1 = palette[idx];
+      const p2 = palette[idx + 1];
+      const span = p2.p - p1.p || 1;
+      const t = Math.max(0, Math.min(1, (pct - p1.p) / span));
+      lut[g * 4] = Math.round(p1.r + t * (p2.r - p1.r));
+      lut[g * 4 + 1] = Math.round(p1.g + t * (p2.g - p1.g));
+      lut[g * 4 + 2] = Math.round(p1.b + t * (p2.b - p1.b));
+      lut[g * 4 + 3] = Math.round(p1.a + t * (p2.a - p1.a));
+    }
+  }
+  return lut;
+}
+
+// Bounding box from XMP metadata: lat 45.2 - 48.5, lon 4.5 - 11.8
+const OUTLOOK_BOUNDS = [[45.2, 4.5], [48.5, 11.8]];
+
 export class ForecastView {
   constructor(container) {
     this.container = container;
@@ -20,6 +95,11 @@ export class ForecastView {
     this.activeOutlookIndex = 0;
     this.isPlayingOutlooks = false;
     this.outlookPlayTimer = null;
+    this.outlookMap = null;
+    this.outlookOverlay = null;
+    this.outlookColorCache = new Map();
+    this.sunshineLut = buildColorLut(SUNSHINE_PALETTE);
+    this.precipLut = buildColorLut(PRECIP_PALETTE);
 
     // 3. Emagram & Previtemps Soundings State
     this.stations = [];
@@ -33,6 +113,17 @@ export class ForecastView {
     this.searchQuery = '';
     this.emagramMap = null;
     this.stationMarkersLayer = null;
+    this.isEmagramExpanded = false;
+    this.showEmagramInfo = false;
+    this.handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (this.showEmagramInfo) {
+          this.toggleEmagramInfo(false);
+        } else if (this.isEmagramExpanded) {
+          this.setEmagramExpanded(false);
+        }
+      }
+    };
 
     // Loading & Error states
     this.loading = false;
@@ -79,6 +170,7 @@ export class ForecastView {
       if (this.activeSection === 'emagram') {
         this.initEmagramMap();
       }
+      window.addEventListener('keydown', this.handleKeyDown);
     }
   }
 
@@ -93,6 +185,13 @@ export class ForecastView {
       this.emagramMap.remove();
       this.emagramMap = null;
     }
+    if (this.outlookMap) {
+      this.outlookMap.remove();
+      this.outlookMap = null;
+      this.outlookOverlay = null;
+    }
+    window.removeEventListener('keydown', this.handleKeyDown);
+    document.body.classList.remove('emagram-expanded-open');
   }
 
   async loadEmagramForecast(station) {
@@ -206,6 +305,9 @@ export class ForecastView {
 
     this.attachEvents();
 
+    if (this.activeSection === 'outlooks' && !this.loading) {
+      setTimeout(() => this.initOutlookMap(), 50);
+    }
     if (this.activeSection === 'emagram' && !this.loading) {
       setTimeout(() => this.initEmagramMap(), 50);
     }
@@ -351,6 +453,112 @@ export class ForecastView {
     return bestSet.files || [];
   }
 
+  async colorizeOutlookImage(imageUrl, type) {
+    if (!imageUrl) return '';
+    const cacheKey = `${type}:${imageUrl}`;
+    if (this.outlookColorCache.has(cacheKey)) {
+      return this.outlookColorCache.get(cacheKey);
+    }
+
+    const lut = type === 'RELATIVE_SUNSHINE' ? this.sunshineLut : this.precipLut;
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width || 276;
+          canvas.height = img.height || 182;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imgData.data;
+          const len = data.length;
+
+          for (let i = 0; i < len; i += 4) {
+            // Android uses the GREEN channel as the weather raster data index
+            const g = data[i + 1];
+            const lutOffset = g * 4;
+            data[i] = lut[lutOffset];
+            data[i + 1] = lut[lutOffset + 1];
+            data[i + 2] = lut[lutOffset + 2];
+            data[i + 3] = lut[lutOffset + 3];
+          }
+
+          ctx.putImageData(imgData, 0, 0);
+          const dataUrl = canvas.toDataURL('image/png');
+          this.outlookColorCache.set(cacheKey, dataUrl);
+          resolve(dataUrl);
+        } catch (err) {
+          console.warn('[Aussichten] Canvas colorization fallback:', err);
+          resolve(imageUrl);
+        }
+      };
+      img.onerror = () => {
+        console.warn('[Aussichten] Failed to load image:', imageUrl);
+        resolve(imageUrl);
+      };
+      img.src = imageUrl;
+    });
+  }
+
+  async initOutlookMap() {
+    const mapEl = document.getElementById('outlook-map');
+    if (!mapEl) return;
+
+    if (this.outlookMap) {
+      this.outlookMap.remove();
+      this.outlookMap = null;
+      this.outlookOverlay = null;
+    }
+
+    // Centered on Switzerland (Älggi-Alp / Central Switzerland)
+    this.outlookMap = L.map(mapEl, {
+      center: [46.8182, 8.2275],
+      zoom: 8,
+      minZoom: 6,
+      maxZoom: 12,
+      zoomControl: true,
+      attributionControl: false,
+    });
+
+    // Basemap: Swisstopo Pixelkarte Grau (Keyless, high-contrast relief layer matching Android)
+    L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg', {
+      maxZoom: 18,
+      attribution: '© swisstopo',
+    }).addTo(this.outlookMap);
+
+    // Initial camera framing
+    this.outlookMap.fitBounds([[45.8, 5.9], [47.8, 10.5]]);
+
+    // Render initial weather raster overlay
+    const files = this.getOutlookFiles();
+    if (files.length > 0) {
+      if (this.activeOutlookIndex >= files.length) {
+        this.activeOutlookIndex = 0;
+      }
+      const currentFileObj = files[this.activeOutlookIndex];
+      if (currentFileObj) {
+        const rawUrl = `https://static-prod.ubmeteo.io/${currentFileObj.file}`;
+        const colorizedUrl = await this.colorizeOutlookImage(rawUrl, this.activeOutlookType);
+        
+        if (this.outlookMap) {
+          this.outlookOverlay = L.imageOverlay(colorizedUrl, OUTLOOK_BOUNDS, {
+            opacity: 0.85,
+            interactive: false,
+            className: 'outlook-weather-overlay',
+          }).addTo(this.outlookMap);
+        }
+      }
+    }
+
+    setTimeout(() => {
+      if (this.outlookMap) this.outlookMap.invalidateSize();
+    }, 200);
+  }
+
   renderOutlooksSection(lang) {
     const files = this.getOutlookFiles();
     const totalFiles = files.length;
@@ -369,24 +577,20 @@ export class ForecastView {
       intervalLabel = `${dStart.toLocaleDateString('de-CH', optionsDay)} ${dStart.toLocaleTimeString('de-CH', optionsTime)} – ${dEnd.toLocaleTimeString('de-CH', optionsTime)}`;
     }
 
-    const imageUrl = currentFileObj
-      ? `https://static-prod.ubmeteo.io/${currentFileObj.file}`
-      : '';
-
     const legendConfig = {
       RELATIVE_SUNSHINE: {
         title: 'Relative Sonnenscheindauer (6h)',
-        gradient: 'linear-gradient(to right, #4A5568 0%, #ECC94B 50%, #FFD700 100%)',
-        labels: ['0%', '25%', '50%', '75%', '100%'],
+        gradient: 'linear-gradient(to right, #FFF8DB 0%, #FFE270 25%, #FFBE33 45%, #FF6F00 65%, #EB0900 85%, #CC0044 100%)',
+        labels: ['0%', '20%', '40%', '60%', '80%', '100%'],
       },
       PRECIPITATION_PROBABILITY_WEAK: {
         title: 'Niederschlagswahrscheinlichkeit leicht (> 0.1 mm / 12h)',
-        gradient: 'linear-gradient(to right, rgba(230,245,255,0.2) 0%, #60A5FA 40%, #1D4ED8 80%, #1E3A8A 100%)',
+        gradient: 'linear-gradient(to right, #C7EDD2 0%, #8EDCA6 25%, #56CA79 45%, #2DC273 65%, #1AA373 85%, #129270 100%)',
         labels: ['0%', '20%', '40%', '60%', '80%', '100%'],
       },
       PRECIPITATION_PROBABILITY_STRONG: {
         title: 'Niederschlagswahrscheinlichkeit stark (> 1.0 mm / 12h)',
-        gradient: 'linear-gradient(to right, rgba(230,245,255,0.2) 0%, #93C5FD 30%, #3B82F6 60%, #1E3A8A 90%, #7C3AED 100%)',
+        gradient: 'linear-gradient(to right, #C7EDD2 0%, #8EDCA6 25%, #56CA79 45%, #2DC273 65%, #1AA373 85%, #129270 100%)',
         labels: ['0%', '20%', '40%', '60%', '80%', '100%'],
       },
     }[this.activeOutlookType];
@@ -397,7 +601,7 @@ export class ForecastView {
           <div>
             <span class="badge-tag">MeteoSchweiz & Ubique ICON-CH2</span>
             <h2 class="section-heading">Meteo-Aussichten (Outlooks)</h2>
-            <p class="section-sub">Flugwetter-Tagesübersicht für die gesamte Schweiz (bis zu 5 Tage im Voraus)</p>
+            <p class="section-sub">Flugwetter-Tagesübersicht auf Swisstopo-Basiskarte für die gesamte Schweiz (bis zu 5 Tage im Voraus)</p>
           </div>
         </div>
 
@@ -414,7 +618,7 @@ export class ForecastView {
           </button>
         </div>
 
-        <!-- Interactive Map Preview Box -->
+        <!-- Interactive Map Container with Swisstopo and Weather Overlay -->
         <div class="outlook-player-container">
           <div class="outlook-time-banner">
             <div class="outlook-time-title">
@@ -426,12 +630,11 @@ export class ForecastView {
             </div>
           </div>
 
-          <div class="outlook-image-wrapper">
-            ${imageUrl ? `
-              <img id="outlook-map-img" src="${imageUrl}" alt="Aussichten Karte" class="outlook-map-img" loading="eager" />
-            ` : `
-              <div class="outlook-empty-box">Kartendaten werden geladen...</div>
-            `}
+          <div class="outlook-map-wrapper">
+            <div id="outlook-map" class="outlook-map-container"></div>
+            <button id="btn-center-outlook" class="outlook-center-btn" title="Schweiz zentrieren">
+              🇨🇭 Zentrieren
+            </button>
           </div>
 
           <!-- Player Controls Bar -->
@@ -486,7 +689,7 @@ export class ForecastView {
     `;
   }
 
-  updateOutlookDOM() {
+  async updateOutlookDOM() {
     const files = this.getOutlookFiles();
     const totalFiles = files.length;
     if (this.activeOutlookIndex >= totalFiles) {
@@ -495,13 +698,7 @@ export class ForecastView {
     const currentFileObj = files[this.activeOutlookIndex];
     if (!currentFileObj) return;
 
-    // 1. Update image in-place
-    const imgEl = this.container.querySelector('#outlook-map-img');
-    if (imgEl) {
-      imgEl.src = `https://static-prod.ubmeteo.io/${currentFileObj.file}`;
-    }
-
-    // 2. Update time label
+    // 1. Update time label
     const timeEl = this.container.querySelector('.outlook-time-text');
     if (timeEl) {
       const dStart = new Date(currentFileObj.start);
@@ -511,19 +708,19 @@ export class ForecastView {
       timeEl.textContent = `${dStart.toLocaleDateString('de-CH', optionsDay)} ${dStart.toLocaleTimeString('de-CH', optionsTime)} – ${dEnd.toLocaleTimeString('de-CH', optionsTime)}`;
     }
 
-    // 3. Update step indicator
+    // 2. Update step indicator
     const stepEl = this.container.querySelector('.outlook-step-indicator');
     if (stepEl) {
       stepEl.textContent = `Intervall ${this.activeOutlookIndex + 1} von ${totalFiles}`;
     }
 
-    // 4. Update slider value
+    // 3. Update slider value
     const slider = this.container.querySelector('#outlook-slider');
     if (slider) {
       slider.value = this.activeOutlookIndex;
     }
 
-    // 5. Update play button icon
+    // 4. Update play button icon
     const playBtn = this.container.querySelector('#outlook-play-btn');
     if (playBtn) {
       if (this.isPlayingOutlooks) {
@@ -544,10 +741,28 @@ export class ForecastView {
       }
     }
 
+    // 5. Update Map Overlay
+    const rawUrl = `https://static-prod.ubmeteo.io/${currentFileObj.file}`;
+    const colorizedUrl = await this.colorizeOutlookImage(rawUrl, this.activeOutlookType);
+
+    if (this.outlookOverlay && this.outlookMap) {
+      this.outlookOverlay.setUrl(colorizedUrl);
+    } else if (this.outlookMap) {
+      this.outlookOverlay = L.imageOverlay(colorizedUrl, OUTLOOK_BOUNDS, {
+        opacity: 0.85,
+        interactive: false,
+        className: 'outlook-weather-overlay',
+      }).addTo(this.outlookMap);
+    }
+
     // 6. Prefetch next 2 frames
-    const nextIdx = (this.activeOutlookIndex + 1) % totalFiles;
-    if (files[nextIdx]) {
-      new Image().src = `https://static-prod.ubmeteo.io/${files[nextIdx].file}`;
+    const nextIdx1 = (this.activeOutlookIndex + 1) % totalFiles;
+    const nextIdx2 = (this.activeOutlookIndex + 2) % totalFiles;
+    if (files[nextIdx1]) {
+      this.colorizeOutlookImage(`https://static-prod.ubmeteo.io/${files[nextIdx1].file}`, this.activeOutlookType);
+    }
+    if (files[nextIdx2]) {
+      this.colorizeOutlookImage(`https://static-prod.ubmeteo.io/${files[nextIdx2].file}`, this.activeOutlookType);
     }
   }
 
@@ -647,7 +862,15 @@ export class ForecastView {
 
   renderEmagramAndroidCard() {
     if (!this.selectedStation) {
-      return `<div class="info-notice">Bitte wähle eine Station auf der Karte aus.</div>`;
+      return `
+        <div class="emagram-placeholder-prompt">
+          <div class="emagram-placeholder-icon">📈</div>
+          <div class="emagram-placeholder-content">
+            <h4>Wähle eine Radiosondierungs-Station</h4>
+            <p>Klicke auf einen Pin auf der Schweizer Swisstopo-Karte oder wähle eine Station aus den beliebten Orten oben, um das aerologische Emagramm und die ICON-CH1 Thermik-Prognose anzuzeigen.</p>
+          </div>
+        </div>
+      `;
     }
 
     if (this.soundingLoading && !this.emagramForecastData) {
@@ -755,10 +978,12 @@ export class ForecastView {
     const cursorPct = totalSteps > 1 ? (this.activeEmagramTimeIndex / (totalSteps - 1)) * 100 : 0;
 
     return `
-      <div class="emagram-android-frame">
+      ${this.isEmagramExpanded ? '<div id="emagram-backdrop" class="emagram-backdrop"></div>' : ''}
+      ${this.showEmagramInfo ? this.renderEmagramInfoModal() : ''}
+      <div class="emagram-android-frame ${this.isEmagramExpanded ? 'is-expanded' : ''}">
         <!-- Top App Navigation Bar -->
         <div class="emagram-top-nav">
-          <button id="btn-emagram-back" class="emagram-nav-btn" title="Zurück zur Karte">
+          <button id="btn-emagram-back" class="emagram-nav-btn" title="${this.isEmagramExpanded ? 'Vollbild beenden' : 'Zurück zur Karte'}">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <line x1="19" y1="12" x2="5" y2="12"></line>
               <polyline points="12 19 5 12 12 5"></polyline>
@@ -767,7 +992,7 @@ export class ForecastView {
 
           <div class="emagram-title-center">
             <h3 id="emagram-station-title">${this.selectedStation.name}</h3>
-            <span>Emagram forecast</span>
+            <span>${this.isEmagramExpanded ? 'Emagram forecast (Vollbild)' : 'Emagram forecast'}</span>
           </div>
 
           <button id="btn-emagram-info" class="emagram-nav-btn" title="Emagramm-Erklärung">
@@ -785,13 +1010,22 @@ export class ForecastView {
             <div id="emagram-header-time" class="emagram-timestamp-badge">${headerTimeStr}</div>
             <div class="emagram-model-badge">ICON-CH1 · MeteoSchweiz</div>
           </div>
-          <button class="emagram-expand-btn" title="Vollbild">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-              <polyline points="15 3 21 3 21 9"></polyline>
-              <polyline points="9 21 3 21 3 15"></polyline>
-              <line x1="21" y1="3" x2="14" y2="10"></line>
-              <line x1="3" y1="21" x2="10" y2="14"></line>
-            </svg>
+          <button id="btn-emagram-expand" class="emagram-expand-btn ${this.isEmagramExpanded ? 'active' : ''}" title="${this.isEmagramExpanded ? 'Verkleinern (Esc)' : 'Vollbild'}">
+            ${this.isEmagramExpanded ? `
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polyline points="4 14 10 14 10 20"></polyline>
+                <polyline points="20 10 14 10 14 4"></polyline>
+                <line x1="14" y1="10" x2="21" y2="3"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            ` : `
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            `}
           </button>
         </div>
 
@@ -1236,6 +1470,9 @@ export class ForecastView {
     const nextBtn = this.container.querySelector('#emagram-next-btn');
     const playBtn = this.container.querySelector('#emagram-play-btn');
     const backBtn = this.container.querySelector('#btn-emagram-back');
+    const expandBtn = this.container.querySelector('#btn-emagram-expand') || this.container.querySelector('.emagram-expand-btn');
+    const backdrop = this.container.querySelector('#emagram-backdrop');
+    const infoBtn = this.container.querySelector('#btn-emagram-info');
 
     if (slider) {
       slider.addEventListener('input', (e) => {
@@ -1263,13 +1500,147 @@ export class ForecastView {
     }
 
     if (backBtn) {
-      backBtn.addEventListener('click', () => {
-        const mapEl = document.getElementById('emagram-map');
-        if (mapEl) {
-          mapEl.scrollIntoView({ behavior: 'smooth' });
-        }
+      backBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.handleEmagramBack();
       });
     }
+
+    if (expandBtn) {
+      expandBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggleEmagramExpand();
+      });
+    }
+
+    if (backdrop) {
+      backdrop.addEventListener('click', () => {
+        this.setEmagramExpanded(false);
+      });
+    }
+
+    if (infoBtn) {
+      infoBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggleEmagramInfo(true);
+      });
+    }
+
+    const closeInfoBtn = this.container.querySelector('#btn-close-emagram-info');
+    const okInfoBtn = this.container.querySelector('#btn-ok-emagram-info');
+    const infoBackdrop = this.container.querySelector('#emagram-info-backdrop');
+    if (closeInfoBtn) closeInfoBtn.addEventListener('click', () => this.toggleEmagramInfo(false));
+    if (okInfoBtn) okInfoBtn.addEventListener('click', () => this.toggleEmagramInfo(false));
+    if (infoBackdrop) {
+      infoBackdrop.addEventListener('click', (e) => {
+        if (e.target === infoBackdrop) this.toggleEmagramInfo(false);
+      });
+    }
+  }
+
+  handleEmagramBack() {
+    if (this.isEmagramExpanded) {
+      this.setEmagramExpanded(false);
+      return;
+    }
+
+    // Deselect active station and stop player
+    this.selectedStation = null;
+    this.emagramForecastData = null;
+    this.stopEmagramPlayer();
+
+    // Reset markers and popular station pills
+    this.renderEmagramMarkers();
+    this.container.querySelectorAll('.popular-station-pill').forEach(btn => {
+      btn.classList.remove('active');
+    });
+
+    // Re-render detail container to show empty/placeholder state
+    this.updateEmagramDetailDOM();
+
+    // Scroll smoothly back to map & station selector
+    const scrollWrapper = this.container.querySelector('.forecast-view-wrapper')
+      || this.container.closest('.forecast-view-wrapper')
+      || document.querySelector('.forecast-view-wrapper');
+    if (scrollWrapper && typeof scrollWrapper.scrollTo === 'function') {
+      scrollWrapper.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    const mapEl = document.getElementById('emagram-map');
+    if (mapEl) {
+      mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    if (this.emagramMap) {
+      setTimeout(() => this.emagramMap.invalidateSize(), 300);
+    }
+  }
+
+  setEmagramExpanded(expanded) {
+    this.isEmagramExpanded = !!expanded;
+    if (this.isEmagramExpanded) {
+      document.body.classList.add('emagram-expanded-open');
+    } else {
+      document.body.classList.remove('emagram-expanded-open');
+    }
+    this.updateEmagramDetailDOM();
+  }
+
+  toggleEmagramExpand() {
+    this.setEmagramExpanded(!this.isEmagramExpanded);
+  }
+
+  toggleEmagramInfo(show) {
+    this.showEmagramInfo = typeof show === 'boolean' ? show : !this.showEmagramInfo;
+    this.updateEmagramDetailDOM();
+  }
+
+  renderEmagramInfoModal() {
+    return `
+      <div class="emagram-info-modal-backdrop" id="emagram-info-backdrop">
+        <div class="emagram-info-modal-card">
+          <div class="modal-header">
+            <div>
+              <h3 class="modal-title">Aerologisches Emagramm & Previtemps</h3>
+              <p class="modal-subtitle">Leitfaden zur Interpretation des thermodynamischen Soundings</p>
+            </div>
+            <button class="modal-close" id="btn-close-emagram-info">&times;</button>
+          </div>
+          <div class="emagram-info-modal-body">
+            <div class="emagram-guide-section">
+              <div class="guide-badge temp">🌡️ Zustandskurve (Temperaturverlauf)</div>
+              <p>Die farbigen Kurvensegmente zeigen die Umgebungstemperatur mit zunehmender Höhe (Luftdruck von 1000 bis 600 hPa). Die Neigung entspricht dem vertikalen Temperaturgradienten (Lapse Rate in °C / 100 m):</p>
+              <div class="lapse-rate-guide-grid">
+                <div class="lapse-pill purple"><strong>&lt; -1.0 °C / 100m</strong>: Überadiabatisch (stark überhitzt, bodennah extrem labil)</div>
+                <div class="lapse-pill red"><strong>-1.0 bis -0.8 °C / 100m</strong>: Trockenadiabatisch (hervorragend für Thermikentwicklung)</div>
+                <div class="lapse-pill blue"><strong>-0.8 bis -0.6 °C / 100m</strong>: Feuchtadiabatisch (kondensationslabil, Quellwolken möglich)</div>
+                <div class="lapse-pill green"><strong>-0.6 bis -0.3 °C / 100m</strong>: Mässig labil / schwächere Thermik</div>
+                <div class="lapse-pill yellow"><strong>≥ 0.0 °C / 100m</strong>: Inversion / Isothermie (stabile Sperrschicht, Thermikdeckel)</div>
+              </div>
+            </div>
+
+            <div class="emagram-guide-section">
+              <div class="guide-badge dew">💧 Taupunktskurve (Luftfeuchte)</div>
+              <p>Die blau gestrichelte Kurve zeigt den Taupunkt. Je näher Temperatur- und Taupunktskurve beieinander liegen (Spread &lt; 2 °C), desto feuchter ist die Luft. Wo beide Kurven sich berühren, liegt 100% relative Feuchte vor = Wolkenbildung (Cumulusbasis).</p>
+            </div>
+
+            <div class="emagram-guide-section">
+              <div class="guide-badge wind">💨 Höhenwind & Windfiedern</div>
+              <p>Rechts zeigt die durchgezogene blaue Linie das Windprofil nach Geschwindigkeit (km/h) mit der Höhe. Die Windfiedern geben Windrichtung (Richtung des Schafts) und Stärke (Fiedern: langes Fähnchen = 10 kt / ca. 18 km/h, kurzes = 5 kt / ca. 9 km/h) an.</p>
+            </div>
+
+            <div class="emagram-guide-section">
+              <div class="guide-badge model">🌐 Numerisches Wettermodell</div>
+              <p>Daten basieren auf der hochauflösenden Prognose <strong>ICON-CH1</strong> von MeteoSchweiz (Gitterauflösung ca. 1.1 km) mit stündlich aktualisierten Soundings über den Tagesverlauf.</p>
+            </div>
+          </div>
+          <div class="modal-actions-row">
+            <button class="btn-primary" id="btn-ok-emagram-info">Verstanden</button>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   stepEmagramTime(delta) {
@@ -1452,6 +1823,14 @@ export class ForecastView {
       btn.addEventListener('click', () => {
         const section = btn.getAttribute('data-section');
         if (section !== this.activeSection) {
+          if (this.activeSection === 'outlooks') {
+            this.stopOutlookPlayer();
+            if (this.outlookMap) {
+              this.outlookMap.remove();
+              this.outlookMap = null;
+              this.outlookOverlay = null;
+            }
+          }
           this.activeSection = section;
           this.render();
         }
@@ -1511,6 +1890,15 @@ export class ForecastView {
       if (playBtn) {
         playBtn.addEventListener('click', () => {
           this.toggleOutlookPlay();
+        });
+      }
+
+      const centerBtn = this.container.querySelector('#btn-center-outlook');
+      if (centerBtn) {
+        centerBtn.addEventListener('click', () => {
+          if (this.outlookMap) {
+            this.outlookMap.fitBounds([[45.8, 5.9], [47.8, 10.5]]);
+          }
         });
       }
     }

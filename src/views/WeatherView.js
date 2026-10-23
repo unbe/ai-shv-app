@@ -192,7 +192,7 @@ export class WeatherView {
 
           <!-- Trend Chart Container (Real History) -->
           <div class="chart-wrapper">
-            <h4 class="chart-title">Verlauf Gotthard-Druckdifferenz (Lugano - Kloten, 24h)</h4>
+            <h4 class="chart-title">${this.getChartTitle(activePair)}</h4>
             <div class="chart-canvas-container">
               <canvas id="foehn-history-chart"></canvas>
             </div>
@@ -419,17 +419,44 @@ export class WeatherView {
     `;
   }
 
+  getChartTitle(activePair) {
+    if (!activePair) return 'Verlauf Druckdifferenz (24h)';
+    if (activePair.id === 'KLO_LUG') {
+      return 'Verlauf Gotthard-Druckdifferenz (Lugano – Kloten, 24h)';
+    } else if (activePair.id === 'GVE_GUT') {
+      return 'Verlauf Ost-West-Gradient (Genf – Güttingen, 24h)';
+    } else if (activePair.id === 'PIL_MTR') {
+      return 'Verlauf Alpenkamm Temperatur (Pilatus – Matro, 24h)';
+    } else if (activePair.id === 'DEM_GRE') {
+      return 'Verlauf Jura-Querung Druckdifferenz (Grenchen – Delémont, 24h)';
+    }
+    return `Verlauf ${activePair.nameDe || activePair.name || 'Gradient'} (24h)`;
+  }
+
   initChart() {
     const canvas = this.container.querySelector('#foehn-history-chart');
-    if (!canvas || !this.foehnData?.history) return;
+    if (!canvas || !this.foehnData?.history || this.foehnData.history.length === 0) return;
 
     const history = this.foehnData.history;
     const labels = history.map(h => h.time);
     const dataPoints = history.map(h => h.diffHpa);
 
+    const pairs = this.foehnData?.pairs || [];
+    const activePair = pairs.find(p => p.id === this.selectedPairId) || pairs[0] || {
+      id: 'KLO_LUG',
+      nameDe: 'Gotthard-Achse (Zürich/Kloten – Lugano)',
+      unit: 'hPa',
+      isPressure: true,
+    };
+
     const isDark = store.state.theme === 'dark';
     const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
     const textColor = isDark ? '#94A3B8' : '#64748B';
+    const zeroLineColor = isDark ? 'rgba(255, 255, 255, 0.28)' : 'rgba(0, 0, 0, 0.28)';
+
+    const isTemp = !activePair.isPressure;
+    const lineColor = isTemp ? '#A855F7' : '#0089CF';
+    const areaColor = isTemp ? 'rgba(168, 85, 247, 0.14)' : 'rgba(0, 137, 207, 0.14)';
 
     if (this.chart) {
       this.chart.destroy();
@@ -441,39 +468,52 @@ export class WeatherView {
         labels,
         datasets: [
           {
-            label: 'Druckdifferenz Lugano - Kloten (hPa)',
+            label: `${activePair.nameDe || 'Differenz'} (${activePair.unit || 'hPa'})`,
             data: dataPoints,
-            borderColor: '#EF4444',
-            backgroundColor: 'rgba(239, 68, 68, 0.12)',
+            borderColor: lineColor,
+            backgroundColor: areaColor,
             borderWidth: 2.5,
             fill: true,
             tension: 0.35,
-            pointRadius: 3,
+            pointRadius: history.length > 50 ? 0 : 2.5,
             pointHoverRadius: 6,
+            pointHitRadius: 10,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
         plugins: {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (ctx) => `Differenz: ${ctx.parsed.y > 0 ? '+' : ''}${ctx.parsed.y} hPa`,
+              label: (ctx) => `Differenz: ${ctx.parsed.y > 0 ? '+' : ''}${ctx.parsed.y} ${activePair.unit || 'hPa'}`,
             },
           },
         },
         scales: {
           x: {
             grid: { color: gridColor },
-            ticks: { color: textColor },
-          },
-          y: {
-            grid: { color: gridColor },
             ticks: {
               color: textColor,
-              callback: (v) => `${v > 0 ? '+' : ''}${v} hPa`,
+              maxTicksLimit: 8,
+              maxRotation: 0,
+              autoSkip: true,
+            },
+          },
+          y: {
+            grid: {
+              color: (context) => (context.tick.value === 0 ? zeroLineColor : gridColor),
+              lineWidth: (context) => (context.tick.value === 0 ? 1.5 : 1),
+            },
+            ticks: {
+              color: textColor,
+              callback: (v) => `${v > 0 ? '+' : ''}${v} ${activePair.unit || 'hPa'}`,
             },
           },
         },
@@ -584,9 +624,20 @@ export class WeatherView {
 
     // Pair Switcher
     this.container.querySelectorAll('.pair-pill-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.selectedPairId = btn.getAttribute('data-pair-id');
+      btn.addEventListener('click', async () => {
+        const pairId = btn.getAttribute('data-pair-id');
+        this.selectedPairId = pairId;
         this.render();
+
+        try {
+          const updatedFoehn = await ShvApi.getFoehn(pairId);
+          if (updatedFoehn && updatedFoehn.history) {
+            this.foehnData = updatedFoehn;
+            this.render();
+          }
+        } catch (e) {
+          console.error('[WeatherView] Error fetching pair history:', e);
+        }
       });
     });
 
