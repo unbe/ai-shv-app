@@ -51,8 +51,8 @@ USER node
 
 EXPOSE 3000
 
-# Health check against API endpoint
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3000/api/meteo/foehn > /dev/null || exit 1
+# Health check against local API endpoint (no external network dependencies)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget -qO- http://localhost:3000/api/health > /dev/null || exit 1
 
 CMD ["node", "server/index.js"]

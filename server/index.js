@@ -18,6 +18,11 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Local healthcheck endpoint (zero external network calls)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 // In-memory cache for external weather and webcam data
 const cache = {
   measurements: { data: null, timestamp: 0, ttl: 60 * 1000 },
