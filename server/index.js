@@ -900,6 +900,18 @@ app.post('/api/auth/logout', (req, res) => {
   }
 });
 
+// Serve production static frontend if built (Docker & production)
+const distPath = path.join(projectRoot, 'dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[SHV-Backend] Running on http://0.0.0.0:${PORT}`);
+  console.log(`[Swiss Free Flight] Server running on http://0.0.0.0:${PORT}`);
 });

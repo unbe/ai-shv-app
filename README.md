@@ -145,6 +145,35 @@ npm run preview
 
 ---
 
+## Running with Docker
+
+You can run the entire application (frontend + backend API + aerological sounding calculations) inside a lightweight container:
+
+### Using Docker Compose (Recommended)
+
+```bash
+docker compose up --build -d
+```
+
+Open `http://localhost:3000` in your browser.
+
+To stop the container:
+```bash
+docker compose down
+```
+
+### Using Plain Docker
+
+```bash
+# 1. Build the production image
+docker build -t swiss-free-flight .
+
+# 2. Run the container
+docker run -d --name swiss-free-flight -p 3000:3000 swiss-free-flight
+```
+
+---
+
 ## Automated Screenshots & Chrome DevTools MCP
 
 The repository includes a Puppeteer automation script to capture clean, high-DPI screenshots of all app views:
