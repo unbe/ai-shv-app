@@ -19,14 +19,14 @@ class AppState {
       
       // Map configuration
       baseMap: 'topoLight', // 'topoLight' | 'topoColor' | 'topoSatellite' | 'topoOsm'
-      mapCategory: 'AIRSPACE', // 'METEO' | 'AIRSPACE' | 'FLYING_AREAS'
+      mapCategory: 'METEO', // 'METEO' | 'AIRSPACE' | 'FLYING_AREAS'
       meteoMode: 'WIND', // 'WIND' | 'TEMPERATURE' | 'PRESSURE_DIFFERENCE' | 'WEBCAM' | 'NONE'
       layers: {
-        launches: true,
-        landings: true,
-        airspace: true,
-        wildschutz: true,
-        obstacles: true,
+        launches: false,
+        landings: false,
+        airspace: false,
+        wildschutz: false,
+        obstacles: false,
         stations: true,
         webcams: false,
         foehnAxis: false,
@@ -179,6 +179,34 @@ class AppState {
 
   setMapCategory(category) {
     this.state.mapCategory = category;
+    if (category === 'METEO') {
+      this.state.layers.stations = true;
+      this.state.layers.launches = false;
+      this.state.layers.landings = false;
+      this.state.layers.airspace = false;
+      this.state.layers.wildschutz = false;
+      this.state.layers.obstacles = false;
+      this.state.layers.webcams = false;
+      this.state.layers.foehnAxis = false;
+    } else if (category === 'AIRSPACE') {
+      this.state.layers.airspace = true;
+      this.state.layers.wildschutz = true;
+      this.state.layers.stations = false;
+      this.state.layers.launches = false;
+      this.state.layers.landings = false;
+      this.state.layers.obstacles = false;
+      this.state.layers.webcams = false;
+      this.state.layers.foehnAxis = false;
+    } else if (category === 'FLYING_AREAS') {
+      this.state.layers.launches = true;
+      this.state.layers.landings = true;
+      this.state.layers.airspace = false;
+      this.state.layers.wildschutz = false;
+      this.state.layers.stations = false;
+      this.state.layers.obstacles = false;
+      this.state.layers.webcams = false;
+      this.state.layers.foehnAxis = false;
+    }
     this.notify();
   }
 

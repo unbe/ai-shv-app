@@ -84,7 +84,7 @@ export class MapView {
 
   renderLayout() {
     const t = store.t;
-    const { layers, baseMap, windFilter, searchQuery, meteoMode, mapCategory = 'AIRSPACE' } = store.state;
+    const { layers, baseMap, windFilter, searchQuery, meteoMode, mapCategory = 'METEO' } = store.state;
 
     const windDirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
