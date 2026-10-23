@@ -290,8 +290,17 @@ export function renderBottomSheet(container) {
   }
   // 3. WEBCAM DETAILS
   else if (selectedWebcam) {
-    const p = selectedWebcam.properties || {};
-    const imgUrl = p.mediumResolutionImageUrl || p.thumbnailUrl || p.highResolutionImageUrl;
+    const p = selectedWebcam.properties || selectedWebcam || {};
+    const latestImg = p.latestImageUrl || p.mediumResolutionImageUrl || p.highResolutionImageUrl || p.thumbnailUrl;
+    const thumbImg = p.thumbnailUrl || latestImg;
+    const timelapseImg = p.currentHourTimelapseUrl || p.currentDayTimelapseUrl;
+    const title = p.name || p.title || 'Webcam';
+    const subtitle = [
+      p.location,
+      p.altitudeM ? `${Math.round(p.altitudeM)} m` : null,
+      p.providerDisplayName || null,
+    ].filter(Boolean).join(' • ');
+    const fullUrl = p.attributionUrl || p.providerUrl || p.liveUrl || latestImg;
 
     container.innerHTML = `
       <div class="sheet-scrim" id="sheet-scrim"></div>
@@ -301,28 +310,60 @@ export function renderBottomSheet(container) {
         <div class="sheet-header">
           <div class="sheet-title-group">
             <span class="sheet-badge badge-webcam">Live Webcam</span>
-            <h2 class="sheet-title">${p.title || p.name || 'Webcam'}</h2>
+            <h2 class="sheet-title">${title}</h2>
+            ${subtitle ? `<span class="sheet-sub" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">${subtitle}</span>` : ''}
           </div>
           <button class="sheet-close" id="sheet-close-btn">&times;</button>
         </div>
 
         <div class="sheet-body">
-          ${imgUrl ? `
+          ${latestImg ? `
             <div class="webcam-viewer">
-              <img src="${imgUrl}" alt="${p.title || 'Webcam'}" class="webcam-img" loading="eager" />
+              <img id="webcam-display-img" src="${latestImg}" alt="${title}" class="webcam-img" loading="eager" onerror="if(this.src!=='${thumbImg}') { this.src='${thumbImg}'; } else { this.parentElement.innerHTML='<p class=\\'error-notice\\'>Kein Bild verfügbar</p>'; }" />
             </div>
           ` : '<p class="error-notice">Kein Bild verfügbar</p>'}
 
-          ${p.liveUrl ? `
-            <div class="sheet-actions">
-              <a href="${p.liveUrl}" target="_blank" rel="noopener" class="btn-action btn-nav">
-                <span>Webcam Vollbild ↗</span>
+          <div class="sheet-actions" style="margin-top: 14px; display: flex; gap: 8px;">
+            ${timelapseImg ? `
+              <button id="btn-webcam-toggle-timelapse" class="btn-action btn-secondary" style="flex: 1;" data-playing="false">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <span id="timelapse-btn-label">Timelapse (1h)</span>
+              </button>
+            ` : ''}
+            ${fullUrl ? `
+              <a href="${fullUrl}" target="_blank" rel="noopener" class="btn-action btn-nav" style="flex: 1;">
+                <span>Vollbild / Quelle ↗</span>
               </a>
-            </div>
-          ` : ''}
+            ` : ''}
+          </div>
         </div>
       </div>
     `;
+
+    const timelapseBtn = container.querySelector('#btn-webcam-toggle-timelapse');
+    const displayImg = container.querySelector('#webcam-display-img');
+    const timelapseLabel = container.querySelector('#timelapse-btn-label');
+
+    if (timelapseBtn && displayImg) {
+      timelapseBtn.addEventListener('click', () => {
+        const isPlaying = timelapseBtn.getAttribute('data-playing') === 'true';
+        if (isPlaying) {
+          displayImg.src = latestImg;
+          timelapseBtn.setAttribute('data-playing', 'false');
+          timelapseBtn.classList.remove('btn-primary');
+          timelapseBtn.classList.add('btn-secondary');
+          if (timelapseLabel) timelapseLabel.textContent = 'Timelapse (1h)';
+        } else {
+          displayImg.src = timelapseImg;
+          timelapseBtn.setAttribute('data-playing', 'true');
+          timelapseBtn.classList.remove('btn-secondary');
+          timelapseBtn.classList.add('btn-primary');
+          if (timelapseLabel) timelapseLabel.textContent = 'Aktuelles Bild';
+        }
+      });
+    }
   }
   // 4. BAZL AVIATION OBSTACLE DETAILS
   else if (selectedObstacle) {

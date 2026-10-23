@@ -248,7 +248,7 @@ export class WeatherView {
               ${webcams.slice(0, 36).map(wc => `
                 <div class="webcam-card-item" data-webcam-id="${wc.identifier || ''}">
                   <div class="webcam-thumb-container">
-                    <img src="${wc.thumbnailUrl || wc.latestImageUrl}" alt="${wc.name}" class="webcam-thumb-img" loading="lazy" />
+                    <img src="${wc.thumbnailUrl || wc.latestImageUrl}" alt="${wc.name}" class="webcam-thumb-img" loading="lazy" onerror="if(this.src!=='${wc.latestImageUrl}') { this.src='${wc.latestImageUrl}'; }" />
                     <span class="webcam-alt-tag">${wc.altitudeM ? `${Math.round(wc.altitudeM)}m` : ''}</span>
                   </div>
                   <div class="webcam-card-meta">

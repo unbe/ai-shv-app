@@ -1605,6 +1605,33 @@ body {
   color: white;
 }
 
+/* Webcam bottom sheet styling */
+.sheet-webcam-content {
+  max-width: 680px;
+}
+
+.webcam-viewer {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #090d16;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  min-height: 200px;
+  border: 1px solid var(--border-color);
+}
+
+.webcam-img {
+  width: 100%;
+  height: auto;
+  max-height: 55vh;
+  object-fit: contain;
+  display: block;
+}
+
 /* ==========================================================
    WEATHER & FOEHN SECTION
    ========================================================== */
@@ -3020,6 +3047,10 @@ body {
     left: auto;
     right: 24px;
     width: 440px;
+  }
+
+  #bottom-sheet-container:has(.sheet-webcam-content) {
+    width: 620px;
   }
 
   .sheet-content {
