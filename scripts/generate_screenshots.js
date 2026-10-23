@@ -22,6 +22,11 @@ async function captureAll() {
   await page.bringToFront();
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
   
+  const screenshotsDir = path.join(process.cwd(), 'screenshots');
+  if (!fs.existsSync(screenshotsDir)) {
+    fs.mkdirSync(screenshotsDir, { recursive: true });
+  }
+
   // Reload page to start with a pristine state
   console.log('Reloading page for fresh state...');
   await page.reload({ waitUntil: 'networkidle2' });
@@ -84,7 +89,7 @@ async function captureAll() {
   });
   await setMapView(46.818, 8.227, 9);
   await sleep(1000);
-  await page.screenshot({ path: '01_fluggebiete_overview.png' });
+  await page.screenshot({ path: 'screenshots/01_fluggebiete_overview.png' });
   console.log('-> Saved 01_fluggebiete_overview.png');
 
   // ==========================================
@@ -101,7 +106,7 @@ async function captureAll() {
     if (launchMarker) launchMarker.click();
   });
   await sleep(800);
-  await page.screenshot({ path: '02_fluggebiete_startplatz_detail.png' });
+  await page.screenshot({ path: 'screenshots/02_fluggebiete_startplatz_detail.png' });
   console.log('-> Saved 02_fluggebiete_startplatz_detail.png');
 
   // ==========================================
@@ -117,7 +122,7 @@ async function captureAll() {
     if (voltePin) voltePin.click();
   });
   await sleep(800);
-  await page.screenshot({ path: '03_landevolte_circuit_detail.png' });
+  await page.screenshot({ path: 'screenshots/03_landevolte_circuit_detail.png' });
   console.log('-> Saved 03_landevolte_circuit_detail.png');
 
   // ==========================================
@@ -135,7 +140,7 @@ async function captureAll() {
     if (btnLayers) btnLayers.classList.add('active');
   });
   await sleep(800);
-  await page.screenshot({ path: '04_karten_ebenen_drawer.png' });
+  await page.screenshot({ path: 'screenshots/04_karten_ebenen_drawer.png' });
   console.log('-> Saved 04_karten_ebenen_drawer.png');
 
   // ==========================================
@@ -150,7 +155,7 @@ async function captureAll() {
   });
   await setMapView(46.57, 7.95, 11); // Over Jungfrau / Eiger / Grindelwald
   await sleep(1500);
-  await page.screenshot({ path: '05_swisstopo_satellit_ortho.png' });
+  await page.screenshot({ path: 'screenshots/05_swisstopo_satellit_ortho.png' });
   console.log('-> Saved 05_swisstopo_satellit_ortho.png');
 
   // Reset basemap back to standard topo
@@ -181,7 +186,7 @@ async function captureAll() {
     if (interactive) interactive.click();
   });
   await sleep(800);
-  await page.screenshot({ path: '06_hindernisse_und_luftraeume.png' });
+  await page.screenshot({ path: 'screenshots/06_hindernisse_und_luftraeume.png' });
   console.log('-> Saved 06_hindernisse_und_luftraeume.png');
 
   // ==========================================
@@ -201,7 +206,7 @@ async function captureAll() {
   });
   await setMapView(46.6, 7.6, 9);
   await sleep(1800);
-  await page.screenshot({ path: '07_windstationen_schweiz_international.png' });
+  await page.screenshot({ path: 'screenshots/07_windstationen_schweiz_international.png' });
   console.log('-> Saved 07_windstationen_schweiz_international.png');
 
   // ==========================================
@@ -216,7 +221,7 @@ async function captureAll() {
     if (arrow) arrow.click();
   });
   await sleep(800);
-  await page.screenshot({ path: '08_windstation_messwerte_popup.png' });
+  await page.screenshot({ path: 'screenshots/08_windstation_messwerte_popup.png' });
   console.log('-> Saved 08_windstation_messwerte_popup.png');
 
   // ==========================================
@@ -229,7 +234,7 @@ async function captureAll() {
     window.scrollTo(0, 0);
   });
   await sleep(1500);
-  await page.screenshot({ path: '09_wetter_druckdifferenz_foehn.png' });
+  await page.screenshot({ path: 'screenshots/09_wetter_druckdifferenz_foehn.png' });
   console.log('-> Saved 09_wetter_druckdifferenz_foehn.png');
 
   // ==========================================
@@ -243,7 +248,7 @@ async function captureAll() {
     window.scrollTo(0, 480);
   });
   await sleep(1000);
-  await page.screenshot({ path: '10_wetter_messwerte_stationen.png' });
+  await page.screenshot({ path: 'screenshots/10_wetter_messwerte_stationen.png' });
   console.log('-> Saved 10_wetter_messwerte_stationen.png');
 
   // ==========================================
@@ -257,7 +262,7 @@ async function captureAll() {
     window.scrollTo(0, 450);
   });
   await sleep(1500);
-  await page.screenshot({ path: '11_wetter_webcams_uebersicht.png' });
+  await page.screenshot({ path: 'screenshots/11_wetter_webcams_uebersicht.png' });
   console.log('-> Saved 11_wetter_webcams_uebersicht.png');
 
   // ==========================================
@@ -276,7 +281,7 @@ async function captureAll() {
     window.scrollTo(0, 0);
   });
   await sleep(1000);
-  await page.screenshot({ path: '12_prognosen_alpenwetter_text.png' });
+  await page.screenshot({ path: 'screenshots/12_prognosen_alpenwetter_text.png' });
   console.log('-> Saved 12_prognosen_alpenwetter_text.png');
 
   // ==========================================
@@ -290,7 +295,7 @@ async function captureAll() {
     window.scrollTo(0, 0);
   });
   await sleep(2000);
-  await page.screenshot({ path: '13_prognosen_aussichten_karte.png' });
+  await page.screenshot({ path: 'screenshots/13_prognosen_aussichten_karte.png' });
   console.log('-> Saved 13_prognosen_aussichten_karte.png');
 
   // ==========================================
@@ -304,7 +309,7 @@ async function captureAll() {
     window.scrollTo(0, 0);
   });
   await sleep(1800);
-  await page.screenshot({ path: '14_prognosen_emagramm_sounding.png' });
+  await page.screenshot({ path: 'screenshots/14_prognosen_emagramm_sounding.png' });
   console.log('-> Saved 14_prognosen_emagramm_sounding.png');
 
   // ==========================================
@@ -318,7 +323,7 @@ async function captureAll() {
     window.scrollTo(0, 0);
   });
   await sleep(1500);
-  await page.screenshot({ path: '15_prognosen_isobaren_karten.png' });
+  await page.screenshot({ path: 'screenshots/15_prognosen_isobaren_karten.png' });
   console.log('-> Saved 15_prognosen_isobaren_karten.png');
 
   // ==========================================
@@ -331,7 +336,7 @@ async function captureAll() {
     window.scrollTo(0, 0);
   });
   await sleep(1500);
-  await page.screenshot({ path: '16_sicherheit_dabs_und_flugbuch.png' });
+  await page.screenshot({ path: 'screenshots/16_sicherheit_dabs_und_flugbuch.png' });
   console.log('-> Saved 16_sicherheit_dabs_und_flugbuch.png');
 
   // Reset back to clean map

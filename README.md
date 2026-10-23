@@ -155,6 +155,7 @@ For AI coding agents (such as Antigravity, Claude, or Cursor) using the Model Co
 │   └── state.js              # Central reactive application state store
 ├── scripts/
 │   └── generate_screenshots.js # Automated screenshot capturing tool
+├── screenshots/              # High-DPI screenshots of all application views
 ├── vite.config.js            # Vite configuration with /api proxy
 └── package.json
 ```
