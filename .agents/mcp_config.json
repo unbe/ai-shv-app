@@ -4,8 +4,8 @@
       "command": "npx",
       "args": [
         "chrome-devtools-mcp@latest",
-        "--autoConnect",
-        "--channel=beta"
+        "--wsEndpoint",
+        "ws://host.lima.internal:9222/devtools/browser"
       ]
     }
   }
