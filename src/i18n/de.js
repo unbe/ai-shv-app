@@ -1,12 +1,12 @@
 export const de = {
-  appName: 'SHV FSVL',
-  appSub: 'Schweizerischer Hängegleiter-Verband',
+  appName: 'Swiss Free Flight',
+  appSub: 'Flugwetter & Fluggebiete · Quelle: SHV FSVL',
   tabs: {
     map: 'Live-Karte',
     weather: 'Messwerte & Föhn',
     forecast: 'Prognosen',
     safety: 'Sicherheit & Tools',
-    profile: 'SHV Profil'
+    profile: 'Pilot & Lizenz'
   },
   map: {
     searchPlaceholder: 'Fluggebiet, Startplatz, Ort suchen...',

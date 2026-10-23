@@ -417,7 +417,7 @@ export class ForecastView {
 
         <div class="section-header-row" style="margin-top: 14px;">
           <div>
-            <span class="badge-tag">MeteoSchweiz & SHV</span>
+            <span class="badge-tag">Quelle: MeteoSchweiz & SHV FSVL</span>
             <h2 class="section-heading">${categoryTitle}</h2>
             ${issueTimeStr ? `<p class="section-sub">Ausgabe: ${issueTimeStr}</p>` : ''}
           </div>

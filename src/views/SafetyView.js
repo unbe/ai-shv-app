@@ -210,7 +210,7 @@ export class SafetyView {
         <section class="safety-section logbook-card">
           <div class="section-header-row">
             <div>
-              <span class="badge-tag">SHV Flugbuch</span>
+              <span class="badge-tag">Flugbuch</span>
               <h2 class="section-heading">${t.safety.logbookTitle}</h2>
               <p class="section-sub">Erfasste Flüge & Flugstatistiken</p>
             </div>

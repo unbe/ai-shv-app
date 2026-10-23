@@ -87,10 +87,10 @@ export async function renderProfileView(container) {
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
           </div>
-          <span class="badge-tag">SHV FSVL Mitgliederbereich</span>
-          <h2 class="blocker-title">Nur für Mitglieder</h2>
+          <span class="badge-tag">Pilotenausweis & Verbandskonto</span>
+          <h2 class="blocker-title">Mitglieder-Login</h2>
           <p class="blocker-text">
-            Dieser Bereich ist aktiven Mitgliedern des Schweizerischen Hängegleiter-Verbandes vorbehalten. Melde dich mit deinem offiziellen SHV-Konto an, um deine digitale Mitgliederkarte, Brevet-Lizenzen und Versicherungsnachweise abzurufen.
+            Melde dich mit deinem Verbandskonto an (Quelle: SHV FSVL Keycloak), um deine digitale Mitgliederkarte, Brevet-Lizenzen und Versicherungsnachweise abzurufen.
           </p>
 
           <!-- OPTION A: OFFICIAL OIDC FLOW -->
@@ -268,7 +268,7 @@ export async function renderProfileView(container) {
       <div class="card-presentation-box">
         <div class="shv-digital-card member-card-bg">
           <div class="card-watermark">
-            <img src="/assets/ic_launcher.png" alt="SHV Logo" class="card-logo-watermark" />
+            <img src="/assets/logo.svg" alt="Free Flight Logo" class="card-logo-watermark" />
           </div>
           <div class="card-inner">
             <div class="card-header-line">

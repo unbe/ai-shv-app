@@ -1,12 +1,12 @@
 export const it = {
-  appName: 'FSVL SHV',
-  appSub: 'Federazione Svizzera di Volo Libero',
+  appName: 'Swiss Free Flight',
+  appSub: 'Meteo volo libero & siti · Fonte: FSVL SHV',
   tabs: {
     map: 'Mappa Live',
     weather: 'Misure & Föhn',
     forecast: 'Previsioni',
     safety: 'Sicurezza & Info',
-    profile: 'Profilo FSVL'
+    profile: 'Pilota & Licenza'
   },
   map: {
     searchPlaceholder: 'Cerca sito di volo, decollo, località...',

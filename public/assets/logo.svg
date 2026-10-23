@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="wingGrad" x1="4" y1="8" x2="44" y2="24" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8"/>
+      <stop offset="0.5" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <!-- Alpine peak silhouette in background -->
+  <path d="M10 37L21 21L27 29L34 19L44 37H10Z" fill="#334155" opacity="0.45"/>
+  <!-- Paraglider wing canopy -->
+  <path d="M4 19C10 9 38 9 44 19C38 15 10 15 4 19Z" fill="url(#wingGrad)"/>
+  <!-- Wing cell ribs -->
+  <path d="M14 16.5C18 13.5 30 13.5 34 16.5" stroke="#93C5FD" stroke-width="0.8" opacity="0.7"/>
+  <!-- Suspension lines -->
+  <line x1="6" y1="18.5" x2="24" y2="34" stroke="#94A3B8" stroke-width="1" stroke-linecap="round"/>
+  <line x1="16" y1="15.5" x2="24" y2="34" stroke="#94A3B8" stroke-width="1" stroke-linecap="round"/>
+  <line x1="32" y1="15.5" x2="24" y2="34" stroke="#94A3B8" stroke-width="1" stroke-linecap="round"/>
+  <line x1="42" y1="18.5" x2="24" y2="34" stroke="#94A3B8" stroke-width="1" stroke-linecap="round"/>
+  <!-- Pilot harness dot -->
+  <circle cx="24" cy="34" r="2.5" fill="#F59E0B" stroke="#0F172A" stroke-width="1"/>
+</svg>

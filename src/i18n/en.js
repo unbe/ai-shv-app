@@ -1,12 +1,12 @@
 export const en = {
-  appName: 'SHV FSVL',
-  appSub: 'Swiss Hang Gliding & Paragliding Association',
+  appName: 'Swiss Free Flight',
+  appSub: 'Soaring Weather & Sites · Source: SHV FSVL',
   tabs: {
     map: 'Live Map',
     weather: 'Live & Föhn',
     forecast: 'Forecasts',
     safety: 'Safety & Tools',
-    profile: 'SHV Profile'
+    profile: 'Pilot & License'
   },
   map: {
     searchPlaceholder: 'Search flying area, launch, landing, town...',

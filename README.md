@@ -1,8 +1,8 @@
-# SHV FSVL Web Application
+# Swiss Free Flight Web Application
 
-Modern web application for the **Swiss Hang Gliding and Paragliding Association (SHV FSVL)**.
+Interactive flight preparation, meteorological observation, and airspace safety platform for paraglider and hang glider pilots in Switzerland.
 
-An interactive flight preparation, meteorological observation, and airspace safety platform providing paraglider and hang glider pilots with real-time Swiss Alps weather, takeoff and landing site information, airspaces, and flight planning tools.
+> **Data Sources**: Flying sites, take-offs, landings, and landing circuits sourced from the **Swiss Hang Gliding and Paragliding Association (SHV FSVL)**. Meteorological observations, forecasts, and geographical data provided by MeteoSwiss, Swisstopo, and BAZL.
 
 ---
 

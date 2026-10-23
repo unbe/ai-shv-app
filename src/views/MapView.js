@@ -566,7 +566,7 @@ export class MapView {
     const btnFloatingInfo = this.container.querySelector('#btn-floating-info');
     if (btnFloatingInfo) {
       btnFloatingInfo.addEventListener('click', () => {
-        alert("SHV Live-Karte: Swisstopo Basiskarte, BAZL Luftfahrthindernisse, MeteoSchweiz Messwerte & Skybriefing DABS.");
+        alert("Swiss Free Flight Karte\n\nDatenquellen:\n• Fluggebiete & Landevolten: Schweizerischer Hängegleiter-Verband (SHV FSVL)\n• Basiskarte & Luftbilder: swisstopo\n• Luftfahrthindernisse: BAZL\n• Wetter & Messwerte: MeteoSchweiz & UBimet\n• Lufträume & DABS: Skyguide");
       });
     }
 
@@ -648,21 +648,22 @@ export class MapView {
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
 
     // Swisstopo WMTS Tile Layers (EPSG:3857)
+    const baseAttribution = '&copy; <a href="https://www.swisstopo.admin.ch" target="_blank" rel="noopener">swisstopo</a> · Daten: <a href="https://www.shv-fsvl.ch" target="_blank" rel="noopener">SHV FSVL</a>';
     this.baseLayers = {
       topoColor: L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg', {
-        attribution: '&copy; <a href="https://www.swisstopo.admin.ch">swisstopo</a>',
+        attribution: baseAttribution,
         maxZoom: 18,
       }),
       topoSatellite: L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg', {
-        attribution: '&copy; <a href="https://www.swisstopo.admin.ch">swisstopo SWISSIMAGE</a>',
+        attribution: '&copy; <a href="https://www.swisstopo.admin.ch" target="_blank" rel="noopener">swisstopo SWISSIMAGE</a> · Daten: <a href="https://www.shv-fsvl.ch" target="_blank" rel="noopener">SHV FSVL</a>',
         maxZoom: 19,
       }),
       topoLight: L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-grau/default/current/3857/{z}/{x}/{y}.jpeg', {
-        attribution: '&copy; <a href="https://www.swisstopo.admin.ch">swisstopo</a>',
+        attribution: baseAttribution,
         maxZoom: 18,
       }),
       topoOsm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · Daten: <a href="https://www.shv-fsvl.ch" target="_blank" rel="noopener">SHV FSVL</a>',
         maxZoom: 19,
       }),
     };

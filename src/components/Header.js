@@ -24,7 +24,7 @@ export function renderHeader(container) {
     <header class="app-header">
       <div class="header-left">
         <div class="brand" id="brand-home-btn">
-          <img src="/assets/ic_launcher.png" alt="SHV Logo" class="brand-logo" />
+          <img src="/assets/logo.svg" alt="Swiss Free Flight Logo" class="brand-logo" />
           <div class="brand-text">
             <span class="brand-title">${t.appName}</span>
             <span class="brand-sub">${t.appSub}</span>
