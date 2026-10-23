@@ -1,0 +1,644 @@
+[
+  {
+    "name": "Tuttlingen",
+    "lat": 47.98458,
+    "lon": 8.8205,
+    "elevation": 645
+  },
+  {
+    "name": "Menzenschwand",
+    "lat": 47.81707,
+    "lon": 8.07054,
+    "elevation": 860
+  },
+  {
+    "name": "Altusried",
+    "lat": 47.801,
+    "lon": 10.216,
+    "elevation": 723
+  },
+  {
+    "name": "Beggingen",
+    "lat": 47.766941,
+    "lon": 8.5367052,
+    "elevation": 545
+  },
+  {
+    "name": "Benken",
+    "lat": 47.65312,
+    "lon": 8.65364,
+    "elevation": 450
+  },
+  {
+    "name": "Frauenfeld",
+    "lat": 47.55798,
+    "lon": 8.89747,
+    "elevation": 417
+  },
+  {
+    "name": "Porrentruy",
+    "lat": 47.4172781,
+    "lon": 7.0768831,
+    "elevation": 423
+  },
+  {
+    "name": "Biberstein",
+    "lat": 47.414,
+    "lon": 8.082,
+    "elevation": 386
+  },
+  {
+    "name": "Oberstdorf",
+    "lat": 47.408,
+    "lon": 10.279,
+    "elevation": 813
+  },
+  {
+    "name": "Reigoldswil",
+    "lat": 47.398,
+    "lon": 7.691,
+    "elevation": 509
+  },
+  {
+    "name": "Zürich",
+    "lat": 47.374582,
+    "lon": 8.5412249,
+    "elevation": 408
+  },
+  {
+    "name": "Delémont",
+    "lat": 47.3614049,
+    "lon": 7.3463281,
+    "elevation": 435
+  },
+  {
+    "name": "Appenzell",
+    "lat": 47.3341841,
+    "lon": 9.4098102,
+    "elevation": 780
+  },
+  {
+    "name": "Matzendorf",
+    "lat": 47.3081047,
+    "lon": 7.6275817,
+    "elevation": 510
+  },
+  {
+    "name": "Wald",
+    "lat": 47.2755084,
+    "lon": 8.9151912,
+    "elevation": 615
+  },
+  {
+    "name": "Besançon",
+    "lat": 47.237,
+    "lon": 6.024,
+    "elevation": 235
+  },
+  {
+    "name": "Ermensee",
+    "lat": 47.23,
+    "lon": 8.232,
+    "elevation": 463
+  },
+  {
+    "name": "Neu St. Johann",
+    "lat": 47.2299822,
+    "lon": 9.1942491,
+    "elevation": 756
+  },
+  {
+    "name": "Langendorf",
+    "lat": 47.22,
+    "lon": 7.514,
+    "elevation": 485
+  },
+  {
+    "name": "Frambouhans",
+    "lat": 47.206,
+    "lon": 6.776,
+    "elevation": 855
+  },
+  {
+    "name": "Rufi",
+    "lat": 47.181,
+    "lon": 9.049,
+    "elevation": 425
+  },
+  {
+    "name": "Buchs",
+    "lat": 47.168,
+    "lon": 9.479,
+    "elevation": 448
+  },
+  {
+    "name": "Zug",
+    "lat": 47.166,
+    "lon": 8.515,
+    "elevation": 425
+  },
+  {
+    "name": "Saint-Imier",
+    "lat": 47.1527396,
+    "lon": 6.9976818,
+    "elevation": 820
+  },
+  {
+    "name": "Einsiedeln",
+    "lat": 47.1269478,
+    "lon": 8.7463693,
+    "elevation": 882
+  },
+  {
+    "name": "Walenstadt",
+    "lat": 47.121,
+    "lon": 9.324,
+    "elevation": 427
+  },
+  {
+    "name": "Huttwil",
+    "lat": 47.114,
+    "lon": 7.85,
+    "elevation": 638
+  },
+  {
+    "name": "Schruns",
+    "lat": 47.078,
+    "lon": 9.919,
+    "elevation": 700
+  },
+  {
+    "name": "Neuchâtel",
+    "lat": 46.9894435,
+    "lon": 6.9311883,
+    "elevation": 430
+  },
+  {
+    "name": "Buochs",
+    "lat": 46.9741231,
+    "lon": 8.4204636,
+    "elevation": 440
+  },
+  {
+    "name": "Schiers",
+    "lat": 46.9696941,
+    "lon": 9.6883975,
+    "elevation": 660
+  },
+  {
+    "name": "Linthal",
+    "lat": 46.9283233,
+    "lon": 9.0024265,
+    "elevation": 662
+  },
+  {
+    "name": "Môtiers",
+    "lat": 46.9117359,
+    "lon": 6.6106583,
+    "elevation": 736
+  },
+  {
+    "name": "Altdorf",
+    "lat": 46.8769293,
+    "lon": 8.6403152,
+    "elevation": 458
+  },
+  {
+    "name": "Marbach",
+    "lat": 46.8551983,
+    "lon": 7.9004279,
+    "elevation": 871
+  },
+  {
+    "name": "Chur",
+    "lat": 46.8534685,
+    "lon": 9.5239598,
+    "elevation": 593
+  },
+  {
+    "name": "Payerne",
+    "lat": 46.8200008,
+    "lon": 6.9414719,
+    "elevation": 490
+  },
+  {
+    "name": "Engelberg",
+    "lat": 46.8191276,
+    "lon": 8.4046153,
+    "elevation": 1002
+  },
+  {
+    "name": "Scuol",
+    "lat": 46.7974631,
+    "lon": 10.3022436,
+    "elevation": 1250
+  },
+  {
+    "name": "Davos",
+    "lat": 46.7951578,
+    "lon": 9.8228844,
+    "elevation": 1560
+  },
+  {
+    "name": "Baulmes",
+    "lat": 46.7885973,
+    "lon": 6.5210967,
+    "elevation": 641
+  },
+  {
+    "name": "Ilanz",
+    "lat": 46.7752048,
+    "lon": 9.2047881,
+    "elevation": 711
+  },
+  {
+    "name": "Blumenstein",
+    "lat": 46.7399717,
+    "lon": 7.5241191,
+    "elevation": 659
+  },
+  {
+    "name": "Meiringen",
+    "lat": 46.724565,
+    "lon": 8.1877756,
+    "elevation": 595
+  },
+  {
+    "name": "Wassen",
+    "lat": 46.7067798,
+    "lon": 8.5994632,
+    "elevation": 916
+  },
+  {
+    "name": "Disentis/Mustér",
+    "lat": 46.7045666,
+    "lon": 8.8534504,
+    "elevation": 1130
+  },
+  {
+    "name": "Interlaken",
+    "lat": 46.686,
+    "lon": 7.863,
+    "elevation": 568
+  },
+  {
+    "name": "Boltigen",
+    "lat": 46.62731,
+    "lon": 7.39015,
+    "elevation": 876
+  },
+  {
+    "name": "Grindelwald",
+    "lat": 46.6243945,
+    "lon": 8.0340468,
+    "elevation": 1034
+  },
+  {
+    "name": "Müstair",
+    "lat": 46.6226465,
+    "lon": 10.4481437,
+    "elevation": 1273
+  },
+  {
+    "name": "Charmey",
+    "lat": 46.6201026,
+    "lon": 7.1584124,
+    "elevation": 887
+  },
+  {
+    "name": "Le Sentier",
+    "lat": 46.605736,
+    "lon": 6.2327225,
+    "elevation": 1013
+  },
+  {
+    "name": "Savognin",
+    "lat": 46.598,
+    "lon": 9.593,
+    "elevation": 1207
+  },
+  {
+    "name": "Frutigen",
+    "lat": 46.585249,
+    "lon": 7.6487158,
+    "elevation": 779
+  },
+  {
+    "name": "Samedan",
+    "lat": 46.5338354,
+    "lon": 9.8734682,
+    "elevation": 1707
+  },
+  {
+    "name": "Bedretto",
+    "lat": 46.508,
+    "lon": 8.522,
+    "elevation": 1402
+  },
+  {
+    "name": "Ulrichen",
+    "lat": 46.5042,
+    "lon": 8.3075,
+    "elevation": 1346
+  },
+  {
+    "name": "Faido",
+    "lat": 46.4783262,
+    "lon": 8.7993275,
+    "elevation": 715
+  },
+  {
+    "name": "Château-d'Oex",
+    "lat": 46.4731422,
+    "lon": 7.1320442,
+    "elevation": 958
+  },
+  {
+    "name": "Bormio",
+    "lat": 46.468,
+    "lon": 10.375,
+    "elevation": 1225
+  },
+  {
+    "name": "Lenk",
+    "lat": 46.4543688,
+    "lon": 7.4417141,
+    "elevation": 1068
+  },
+  {
+    "name": "Givrins",
+    "lat": 46.4290743,
+    "lon": 6.2025373,
+    "elevation": 550
+  },
+  {
+    "name": "Fiesch",
+    "lat": 46.401,
+    "lon": 8.131,
+    "elevation": 1049
+  },
+  {
+    "name": "Villeneuve",
+    "lat": 46.3958,
+    "lon": 6.9247,
+    "elevation": 374
+  },
+  {
+    "name": "Lamoura",
+    "lat": 46.3958,
+    "lon": 5.9814,
+    "elevation": 1154
+  },
+  {
+    "name": "Mesocco",
+    "lat": 46.3928437,
+    "lon": 9.2319214,
+    "elevation": 790
+  },
+  {
+    "name": "Poschiavo",
+    "lat": 46.3239262,
+    "lon": 10.0580102,
+    "elevation": 1014
+  },
+  {
+    "name": "Cevio",
+    "lat": 46.3166561,
+    "lon": 8.601322,
+    "elevation": 418
+  },
+  {
+    "name": "Orcier",
+    "lat": 46.311,
+    "lon": 6.513,
+    "elevation": 690
+  },
+  {
+    "name": "Visp",
+    "lat": 46.3013954,
+    "lon": 7.8760727,
+    "elevation": 650
+  },
+  {
+    "name": "Sion",
+    "lat": 46.220428,
+    "lon": 7.3357835,
+    "elevation": 515
+  },
+  {
+    "name": "Péron",
+    "lat": 46.1916,
+    "lon": 5.9261,
+    "elevation": 520
+  },
+  {
+    "name": "Bellinzona",
+    "lat": 46.1915698,
+    "lon": 9.014596,
+    "elevation": 238
+  },
+  {
+    "name": "Sondrio",
+    "lat": 46.171,
+    "lon": 9.873,
+    "elevation": 286
+  },
+  {
+    "name": "Camedo",
+    "lat": 46.1547729,
+    "lon": 8.6098564,
+    "elevation": 549
+  },
+  {
+    "name": "Domodossola",
+    "lat": 46.115,
+    "lon": 8.291,
+    "elevation": 272
+  },
+  {
+    "name": "Evolène",
+    "lat": 46.1134848,
+    "lon": 7.4953535,
+    "elevation": 1370
+  },
+  {
+    "name": "Martigny",
+    "lat": 46.1085936,
+    "lon": 7.074654,
+    "elevation": 471
+  },
+  {
+    "name": "Samoëns",
+    "lat": 46.084,
+    "lon": 6.727,
+    "elevation": 703
+  },
+  {
+    "name": "Orsières",
+    "lat": 46.0310147,
+    "lon": 7.1480035,
+    "elevation": 887
+  },
+  {
+    "name": "Zermatt",
+    "lat": 46.0212002,
+    "lon": 7.7532743,
+    "elevation": 1620
+  },
+  {
+    "name": "Groisy",
+    "lat": 46.018,
+    "lon": 6.173,
+    "elevation": 800
+  },
+  {
+    "name": "Sessa",
+    "lat": 46.002,
+    "lon": 8.814,
+    "elevation": 393
+  },
+  {
+    "name": "Chamonix",
+    "lat": 45.923,
+    "lon": 6.869,
+    "elevation": 1035
+  },
+  {
+    "name": "Clusone",
+    "lat": 45.889,
+    "lon": 9.948,
+    "elevation": 647
+  },
+  {
+    "name": "Thônes",
+    "lat": 45.881,
+    "lon": 6.324,
+    "elevation": 626
+  },
+  {
+    "name": "Valtournenche",
+    "lat": 45.879,
+    "lon": 7.621,
+    "elevation": 1524
+  },
+  {
+    "name": "Lecco",
+    "lat": 45.856,
+    "lon": 9.397,
+    "elevation": 214
+  },
+  {
+    "name": "Coldrerio",
+    "lat": 45.851,
+    "lon": 8.991,
+    "elevation": 351
+  },
+  {
+    "name": "Aosta",
+    "lat": 45.73923,
+    "lon": 7.36542,
+    "elevation": 583
+  },
+  {
+    "name": "Biella",
+    "lat": 45.55695,
+    "lon": 8.06666,
+    "elevation": 420
+  },
+  {
+    "name": "Vals",
+    "lat": 46.618,
+    "lon": 9.18,
+    "elevation": 1252
+  },
+  {
+    "name": "Pontarlier",
+    "lat": 46.905,
+    "lon": 6.354,
+    "elevation": 837
+  },
+  {
+    "name": "Bourg-en-Bresse",
+    "lat": 46.206,
+    "lon": 5.228,
+    "elevation": 230
+  },
+  {
+    "name": "Chambéry",
+    "lat": 45.564,
+    "lon": 5.917,
+    "elevation": 270
+  },
+  {
+    "name": "Albertville",
+    "lat": 45.675,
+    "lon": 6.391,
+    "elevation": 345
+  },
+  {
+    "name": "Lyon",
+    "lat": 45.764,
+    "lon": 4.835,
+    "elevation": 173
+  },
+  {
+    "name": "Saint-Martin-de-Belleville",
+    "lat": 45.382,
+    "lon": 6.505,
+    "elevation": 1450
+  },
+  {
+    "name": "Courmayeur",
+    "lat": 45.792,
+    "lon": 6.97,
+    "elevation": 1224
+  },
+  {
+    "name": "Omegna",
+    "lat": 45.879,
+    "lon": 8.409,
+    "elevation": 295
+  },
+  {
+    "name": "Bergamo",
+    "lat": 45.698,
+    "lon": 9.67,
+    "elevation": 249
+  },
+  {
+    "name": "Malcesine",
+    "lat": 45.763,
+    "lon": 10.809,
+    "elevation": 89
+  },
+  {
+    "name": "Meran",
+    "lat": 46.67,
+    "lon": 11.161,
+    "elevation": 325
+  },
+  {
+    "name": "Sölden",
+    "lat": 46.97,
+    "lon": 11.007,
+    "elevation": 1368
+  },
+  {
+    "name": "Landeck",
+    "lat": 47.139,
+    "lon": 10.566,
+    "elevation": 817
+  },
+  {
+    "name": "Füssen",
+    "lat": 47.571,
+    "lon": 10.701,
+    "elevation": 808
+  },
+  {
+    "name": "Freiburg im Breisgau",
+    "lat": 47.999,
+    "lon": 7.853,
+    "elevation": 278
+  }
+]

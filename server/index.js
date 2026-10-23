@@ -628,10 +628,20 @@ app.get('/api/meteo/outlooks', async (req, res) => {
   }
 });
 
+function getPrevitempsStationsPath() {
+  const candidates = [
+    path.join(__dirname, 'data', 'previtemps_stations.json'),
+    path.join(projectRoot, 'public', 'data', 'previtemps_stations.json'),
+    path.join(projectRoot, 'src', 'data', 'previtemps_stations.json'),
+    path.join(__dirname, 'previtemps_stations.json'),
+  ];
+  return candidates.find(p => fs.existsSync(p)) || candidates[0];
+}
+
 // 9. Official Previtemps / Emagram Sounding Stations
 app.get('/api/meteo/previtemps/stations', (req, res) => {
   try {
-    const stationsPath = path.join(projectRoot, 'src', 'data', 'previtemps_stations.json');
+    const stationsPath = getPrevitempsStationsPath();
     if (fs.existsSync(stationsPath)) {
       const raw = fs.readFileSync(stationsPath, 'utf8');
       return res.json(JSON.parse(raw));
@@ -651,7 +661,7 @@ app.get('/api/meteo/previtemps/forecast', async (req, res) => {
     let lon = req.query.lon ? parseFloat(req.query.lon) : null;
 
     if (lat === null || lon === null || isNaN(lat) || isNaN(lon)) {
-      const stationsPath = path.join(projectRoot, 'src', 'data', 'previtemps_stations.json');
+      const stationsPath = getPrevitempsStationsPath();
       if (fs.existsSync(stationsPath)) {
         const list = JSON.parse(fs.readFileSync(stationsPath, 'utf8'));
         const found = list.find(s => s.name.toLowerCase() === stationName.toLowerCase());
@@ -681,7 +691,7 @@ app.get('/api/meteo/previtemps/forecast/:stationName', async (req, res) => {
     let lat = null;
     let lon = null;
 
-    const stationsPath = path.join(projectRoot, 'src', 'data', 'previtemps_stations.json');
+    const stationsPath = getPrevitempsStationsPath();
     if (fs.existsSync(stationsPath)) {
       const list = JSON.parse(fs.readFileSync(stationsPath, 'utf8'));
       const found = list.find(s => s.name.toLowerCase() === stationName.toLowerCase());
@@ -751,7 +761,7 @@ app.get('/api/meteo/previtemps/sounding', (req, res) => {
 app.get('/api/meteo/previtemps/sounding/:stationName', (req, res) => {
   const stationName = decodeURIComponent(req.params.stationName);
   try {
-    const stationsPath = path.join(projectRoot, 'src', 'data', 'previtemps_stations.json');
+    const stationsPath = getPrevitempsStationsPath();
     let station = null;
     if (fs.existsSync(stationsPath)) {
       const list = JSON.parse(fs.readFileSync(stationsPath, 'utf8'));
