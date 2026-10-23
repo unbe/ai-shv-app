@@ -24,6 +24,7 @@ class AppState {
       layers: {
         launches: false,
         landings: false,
+        landingPatterns: false,
         airspace: false,
         wildschutz: false,
         obstacles: false,
@@ -183,6 +184,7 @@ class AppState {
       this.state.layers.stations = true;
       this.state.layers.launches = false;
       this.state.layers.landings = false;
+      this.state.layers.landingPatterns = false;
       this.state.layers.airspace = false;
       this.state.layers.wildschutz = false;
       this.state.layers.obstacles = false;
@@ -194,12 +196,14 @@ class AppState {
       this.state.layers.stations = false;
       this.state.layers.launches = false;
       this.state.layers.landings = false;
+      this.state.layers.landingPatterns = false;
       this.state.layers.obstacles = false;
       this.state.layers.webcams = false;
       this.state.layers.foehnAxis = false;
     } else if (category === 'FLYING_AREAS') {
       this.state.layers.launches = true;
       this.state.layers.landings = true;
+      this.state.layers.landingPatterns = true;
       this.state.layers.airspace = false;
       this.state.layers.wildschutz = false;
       this.state.layers.stations = false;

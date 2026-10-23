@@ -74,6 +74,7 @@ export class MapView {
     });
     this.obstacleDebounce = null;
     this.stationsLayer = L.layerGroup();
+    this.landingPatternsLayer = L.layerGroup();
     this.webcamsLayer = L.layerGroup();
     this.foehnLayer = L.layerGroup();
     this.pilotMarker = null;
@@ -250,6 +251,15 @@ export class MapView {
                     <input type="checkbox" data-layer="landings" ${layers.landings ? 'checked' : ''} />
                     <span class="switch-toggle"></span>
                   </label>
+
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-volte"></span>
+                      <span>Landevolten (Landing Circuits)</span>
+                    </div>
+                    <input type="checkbox" data-layer="landingPatterns" ${layers.landingPatterns ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
                 </div>
               </div>
 
@@ -334,6 +344,15 @@ export class MapView {
                     <input type="checkbox" data-layer="landings" ${layers.landings ? 'checked' : ''} />
                     <span class="switch-toggle"></span>
                   </label>
+
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-volte"></span>
+                      <span>Landevolten (Landing Circuits)</span>
+                    </div>
+                    <input type="checkbox" data-layer="landingPatterns" ${layers.landingPatterns ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
                 </div>
               </div>
 
@@ -377,6 +396,15 @@ export class MapView {
                       <span>Landeplätze (Landings)</span>
                     </div>
                     <input type="checkbox" data-layer="landings" ${layers.landings ? 'checked' : ''} />
+                    <span class="switch-toggle"></span>
+                  </label>
+
+                  <label class="layer-switch-item">
+                    <div class="layer-switch-label">
+                      <span class="chip-dot dot-volte"></span>
+                      <span>Landevolten (Landing Circuits)</span>
+                    </div>
+                    <input type="checkbox" data-layer="landingPatterns" ${layers.landingPatterns ? 'checked' : ''} />
                     <span class="switch-toggle"></span>
                   </label>
                 </div>
@@ -651,6 +679,7 @@ export class MapView {
     if (layers.obstacles) this.obstaclesLayer.addTo(this.map);
     if (layers.launches) this.launchesLayer.addTo(this.map);
     if (layers.landings) this.landingsLayer.addTo(this.map);
+    if (layers.landingPatterns) this.landingPatternsLayer.addTo(this.map);
     if (layers.stations) this.stationsLayer.addTo(this.map);
     if (layers.webcams) this.webcamsLayer.addTo(this.map);
     if (layers.foehnAxis) this.foehnLayer.addTo(this.map);
@@ -818,6 +847,7 @@ export class MapView {
   renderFlyingSites() {
     this.launchesLayer.clearLayers();
     this.landingsLayer.clearLayers();
+    this.landingPatternsLayer.clearLayers();
 
     if (!this.rawFlyingSites || !this.rawFlyingSites.features) return;
 
@@ -836,10 +866,79 @@ export class MapView {
     for (const feature of this.rawFlyingSites.features) {
       const p = feature.properties || {};
       const type = (p.type || '').toLowerCase();
-      // Primary map markers are launch and landing points only (matching native SHV app)
+
+      // 1. LANDEVOLTEN (Landing Patterns / Circuits)
+      if (type === 'landingpattern') {
+        const coords = feature.geometry?.coordinates;
+        if (!Array.isArray(coords) || coords.length < 2) continue;
+        const latLngs = coords.map(c => [c[1], c[0]]);
+
+        const volteColors = ['#016191', '#9333EA', '#BE177E'];
+        const strokeColor = volteColors[(p.featureIndex || 0) % 3];
+        const site = sitesById[p.siteId];
+        const siteName = site?.siteName || '';
+        const volteName = p.description || 'Landevolte';
+
+        // Outer contrast casing
+        const casing = L.polyline(latLngs, {
+          color: '#0F172A',
+          weight: 6,
+          opacity: 0.65,
+          lineCap: 'round',
+          lineJoin: 'round',
+        });
+
+        // Inner dashed circuit line
+        const line = L.polyline(latLngs, {
+          color: strokeColor,
+          weight: 3.5,
+          opacity: 0.95,
+          dashArray: '8, 6',
+          lineCap: 'round',
+          lineJoin: 'round',
+        });
+
+        // Directional arrowhead at final approach leg
+        const n = latLngs.length;
+        const pEnd = latLngs[n - 1];
+        const pPrev = latLngs[Math.max(0, n - 2)];
+        const dy = pEnd[0] - pPrev[0];
+        const dx = (pEnd[1] - pPrev[1]) * Math.cos(pEnd[0] * Math.PI / 180);
+        const headingDeg = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+
+        const arrowIcon = L.divIcon({
+          className: 'volte-arrow-icon',
+          html: `
+            <div class="volte-arrow-pin" style="transform: rotate(${headingDeg}deg);" title="${volteName}">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="${strokeColor}" stroke="#0F172A" stroke-width="1.8">
+                <path d="M12 2L21 21L12 17L3 21L12 2Z" />
+              </svg>
+            </div>
+          `,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+        });
+        const arrowMarker = L.marker(pEnd, { icon: arrowIcon, interactive: false });
+
+        const group = L.featureGroup([casing, line, arrowMarker]);
+
+        const popupContent = `
+          <div class="airspace-popup volte-popup">
+            <span class="popup-badge" style="background: rgba(147, 51, 234, 0.2); color: #A855F7;">Landevolte</span>
+            <h4 class="popup-title">${volteName}</h4>
+            ${siteName ? `<p class="popup-desc" style="margin-top: 4px;">Landeplatz: <strong>${siteName}</strong></p>` : ''}
+          </div>
+        `;
+        line.bindPopup(popupContent, { maxWidth: 280 });
+        casing.bindPopup(popupContent, { maxWidth: 280 });
+
+        this.landingPatternsLayer.addLayer(group);
+        continue;
+      }
+
+      // 2. LAUNCHES & LANDINGS
       const isLaunch = type === 'launch';
       const isLanding = type === 'landing';
-
       if (!isLaunch && !isLanding) continue;
 
       const latLng = this.getFeatureLatLng(feature);
@@ -884,7 +983,7 @@ export class MapView {
 
     let iconHtml = '';
     if (isLaunch) {
-      // STARTPLATZ (Take-off): Green badge with upward mountain launch peak + directional heading arrow
+      // STARTPLATZ (Take-off): Green badge with upward mountain launch peak + prominent directional pointer
       const isClosed = openingStatus === 'closed';
       const bgColor = isClosed ? '#DC2626' : '#16A34A';
       const innerColor = isClosed ? '#991B1B' : '#15803D';
@@ -895,26 +994,29 @@ export class MapView {
         <div class="shv-site-marker launch-marker ${isClosed ? 'site-closed' : ''}" title="${p.siteName || 'Startplatz'}${primaryDir ? ` (${primaryDir})` : ''}">
           ${hasDir ? `
             <div class="site-marker-dir-arrow" style="transform: rotate(${dirAngle}deg);">
-              <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
-                <path d="M17 1.5L21.5 8.5H12.5L17 1.5Z" fill="#FACC15" stroke="#0F172A" stroke-width="1.3" stroke-linejoin="round"/>
+              <svg width="46" height="46" viewBox="0 0 46 46" fill="none">
+                <!-- Large, prominent directional pointer extending outward from marker -->
+                <path d="M23 1L30 13H16L23 1Z" fill="#FACC15" stroke="#0F172A" stroke-width="2" stroke-linejoin="round"/>
+                <path d="M23 3.5L28 11.5H18L23 3.5Z" fill="#FEF08A"/>
               </svg>
             </div>
           ` : ''}
           <div class="site-marker-core">
-            <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
               <!-- Green launch ring -->
-              <circle cx="16" cy="16" r="14" fill="${bgColor}" stroke="#0F172A" stroke-width="2"/>
+              <circle cx="16" cy="16" r="14" fill="${bgColor}" stroke="#0F172A" stroke-width="2.2"/>
               <circle cx="16" cy="16" r="11" fill="${innerColor}"/>
               ${isClosed ? `
                 <line x1="10" y1="10" x2="22" y2="22" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
                 <line x1="22" y1="10" x2="10" y2="22" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
               ` : `
                 <!-- Mountain Launch Peak Icon -->
-                <path d="M16 7L24 21H8L16 7Z" fill="white" stroke="#0F172A" stroke-width="1.2" stroke-linejoin="round"/>
-                <path d="M16 11.5L20.5 21H11.5L16 11.5Z" fill="#86EFAC"/>
+                <path d="M16 6.5L24.5 21.5H7.5L16 6.5Z" fill="white" stroke="#0F172A" stroke-width="1.3" stroke-linejoin="round"/>
+                <path d="M16 11L21 21.5H11L16 11Z" fill="#86EFAC"/>
               `}
             </svg>
           </div>
+          ${hasDir ? `<span class="site-dir-badge">${primaryDir}</span>` : ''}
         </div>
       `;
     } else {
@@ -926,9 +1028,9 @@ export class MapView {
       iconHtml = `
         <div class="shv-site-marker landing-marker ${isClosed ? 'site-closed' : ''}" title="${p.siteName || 'Landeplatz'}">
           <div class="site-marker-core">
-            <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
               <!-- Blue landing disc -->
-              <circle cx="16" cy="16" r="14" fill="${bgColor}" stroke="#0F172A" stroke-width="2"/>
+              <circle cx="16" cy="16" r="14" fill="${bgColor}" stroke="#0F172A" stroke-width="2.2"/>
               <circle cx="16" cy="16" r="11" fill="${innerColor}"/>
               ${isClosed ? `
                 <line x1="10" y1="10" x2="22" y2="22" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
@@ -949,9 +1051,9 @@ export class MapView {
     const icon = L.divIcon({
       className: 'shv-div-icon',
       html: iconHtml,
-      iconSize: [34, 34],
-      iconAnchor: [17, 17],
-      popupAnchor: [0, -17],
+      iconSize: [46, 46],
+      iconAnchor: [23, 23],
+      popupAnchor: [0, -23],
     });
 
     const marker = L.marker(latLng, { icon });
@@ -1575,6 +1677,7 @@ export class MapView {
 
     updateVisibility(this.launchesLayer, state.layers.launches);
     updateVisibility(this.landingsLayer, state.layers.landings);
+    updateVisibility(this.landingPatternsLayer, state.layers.landingPatterns);
     updateVisibility(this.airspaceLayer, state.layers.airspace);
     updateVisibility(this.wildschutzLayer, state.layers.wildschutz);
     updateVisibility(this.obstaclesLayer, state.layers.obstacles);
